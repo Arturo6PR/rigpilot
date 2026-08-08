@@ -1,0 +1,80 @@
+# RigPilot
+
+RigPilot is a Windows-first workstation intelligence assistant. It provides a safe, read-only
+system inventory covering the operating system, CPU, memory, fixed storage, Python, Git, and
+NVIDIA GPUs.
+
+## Principles
+
+- Native Windows execution in Warp/PowerShell.
+- Read-only diagnostics first.
+- Explicit approval before changes to drivers, services, startup, power settings, or hardware configuration.
+- Structured output suitable for future automation.
+
+## What it does
+
+Each inventory check reports one of three explicit states:
+
+- `success`: the check completed and includes structured data.
+- `unavailable`: the required command is not installed or cannot be found.
+- `failed`: the command timed out, returned an error, or produced malformed output.
+
+External probes run without a command shell and have a five-second default timeout. The Windows
+checks use read-only CIM queries. NVIDIA detection uses `nvidia-smi` when available; its absence
+does not stop the rest of the snapshot.
+
+## Setup
+
+RigPilot requires Python 3.11 or newer. With [uv](https://docs.astral.sh/uv/):
+
+```powershell
+uv sync --extra dev
+```
+
+The repository also includes `scripts\Enter-RigPilot.ps1` for its configured local environment.
+
+## Usage
+
+Human-readable output:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot
+```
+
+Structured JSON output:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot --json
+```
+
+Change the per-command timeout when needed:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot --timeout 10
+```
+
+The installed console entry point is also named `rigpilot`.
+
+Human-readable output converts memory and storage sizes to binary units such as GiB and TiB.
+JSON preserves the source units for automation: Windows memory fields are KiB, storage sizes are
+bytes, and `memory_total_mib` from NVIDIA is MiB. CPU data is always an array because Windows can
+report more than one physical processor.
+
+## Development checks
+
+Run the standard-library unit tests, Ruff, and package import check:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-RigPilot.ps1
+```
+
+Tests cover parsers, missing commands, invalid and expired timeouts, operating-system errors,
+nonzero exits, malformed output, multiple CPUs and GPUs, safe command construction, snapshot
+assembly, and both output modes.
+
+## Current limitations
+
+- Windows 11 and PowerShell are the primary supported environment.
+- The snapshot is local and point-in-time; RigPilot does not send telemetry anywhere.
+- Inventory only reports information. It does not optimize settings or modify drivers, firmware,
+  the registry, services, startup items, or power plans.

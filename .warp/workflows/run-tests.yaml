@@ -1,0 +1,4 @@
+name: Run RigPilot tests
+command: powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Test-RigPilot.ps1"
+tags: ["rigpilot", "test"]
+description: Run the offline RigPilot unit, lint, and import checks.

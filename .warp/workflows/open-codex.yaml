@@ -1,0 +1,4 @@
+name: Open Codex in RigPilot
+command: codex
+tags: ["rigpilot", "codex", "openai"]
+description: Start OpenAI Codex CLI in the RigPilot repository and use its AGENTS.md rules.

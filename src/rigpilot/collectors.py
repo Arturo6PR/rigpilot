@@ -10,6 +10,7 @@ import re
 import shutil
 import sys
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 from rigpilot.models import CheckResult, CheckStatus, Snapshot
@@ -39,6 +40,17 @@ def parse_storage(output: str) -> list[dict[str, Any]]:
     return parse_json_objects(output)
 
 
+def parse_bios(output: str) -> dict[str, Any]:
+    data = parse_json_object(output)
+    release_date = data.get("ReleaseDate")
+    if isinstance(release_date, str):
+        match = re.fullmatch(r"/Date\((-?\d+)(?:[+-]\d+)?\)/", release_date)
+        if match:
+            timestamp = int(match.group(1)) / 1000
+            data["ReleaseDate"] = datetime.fromtimestamp(timestamp, UTC).date().isoformat()
+    return data
+
+
 def parse_git_version(output: str) -> dict[str, str]:
     match = re.fullmatch(r"git version (\S+)", output.strip())
     if not match:
@@ -52,15 +64,32 @@ def parse_nvidia_csv(output: str) -> list[dict[str, Any]]:
     rows = csv.reader(io.StringIO(output))
     gpus = []
     for row in rows:
-        if len(row) != 3:
-            raise ValueError("expected three NVIDIA fields")
-        name, driver, memory = (part.strip() for part in row)
+        if len(row) != 5:
+            raise ValueError("expected five NVIDIA fields")
+        name, driver, memory, utilization, temperature = (part.strip() for part in row)
         try:
             memory_mib = int(memory)
         except ValueError as exc:
             raise ValueError("invalid NVIDIA memory value") from exc
-        gpus.append({"name": name, "driver_version": driver, "memory_total_mib": memory_mib})
+        gpus.append(
+            {
+                "name": name,
+                "driver_version": driver,
+                "memory_total_mib": memory_mib,
+                "utilization_gpu_percent": _parse_optional_integer(utilization),
+                "temperature_celsius": _parse_optional_integer(temperature),
+            }
+        )
     return gpus
+
+
+def _parse_optional_integer(value: str) -> int | None:
+    if value.lower() in {"n/a", "[n/a]", "not supported", "[not supported]"}:
+        return None
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"invalid numeric value: {value}") from exc
 
 
 def _powershell_executable() -> str | None:
@@ -72,13 +101,27 @@ def _collect_command(
 ) -> CheckResult:
     result = runner(command, timeout)
     if result.status is CheckStatus.UNAVAILABLE:
-        return CheckResult.unavailable(result.message or "Command unavailable")
+        return CheckResult(
+            CheckStatus.UNAVAILABLE,
+            message=result.message or "Command unavailable",
+            duration_ms=result.duration_ms,
+        )
     if result.status is CheckStatus.FAILED:
-        return CheckResult.failed(result.message or "Command failed")
+        return CheckResult(
+            CheckStatus.FAILED,
+            message=result.message or "Command failed",
+            duration_ms=result.duration_ms,
+        )
     try:
-        return CheckResult.success(parser(result.stdout))
+        return CheckResult(
+            CheckStatus.SUCCESS, data=parser(result.stdout), duration_ms=result.duration_ms
+        )
     except (csv.Error, TypeError, ValueError) as exc:
-        return CheckResult.failed(f"Could not parse command output: {exc}")
+        return CheckResult(
+            CheckStatus.FAILED,
+            message=f"Could not parse command output: {exc}",
+            duration_ms=result.duration_ms,
+        )
 
 
 def _collect_cim(
@@ -137,6 +180,49 @@ def collect_snapshot(runner: Runner = run_command, timeout: float = 5.0) -> Snap
         timeout,
         filter_expression="DriveType=3",
     )
+    system = _collect_cim(
+        "Win32_ComputerSystem",
+        ["Manufacturer", "Model"],
+        parse_json_object,
+        runner,
+        timeout,
+    )
+    bios = _collect_cim(
+        "Win32_BIOS",
+        ["Manufacturer", "SMBIOSBIOSVersion", "ReleaseDate"],
+        parse_bios,
+        runner,
+        timeout,
+    )
+    memory_modules = _collect_cim(
+        "Win32_PhysicalMemory",
+        ["Manufacturer", "PartNumber", "Capacity", "Speed", "ConfiguredClockSpeed"],
+        parse_json_objects,
+        runner,
+        timeout,
+    )
+    physical_disks = _collect_cim(
+        "Win32_DiskDrive",
+        ["Model", "InterfaceType", "MediaType", "Size", "Status"],
+        parse_json_objects,
+        runner,
+        timeout,
+    )
+    powershell = _powershell_executable()
+    if powershell is None:
+        uptime = CheckResult.unavailable("PowerShell is not available")
+    else:
+        uptime_expression = (
+            "Get-CimInstance -ClassName Win32_OperatingSystem | "
+            "Select-Object @{Name='UptimeSeconds';Expression={"
+            "[int64]((Get-Date)-$_.LastBootUpTime).TotalSeconds}} | ConvertTo-Json -Compress"
+        )
+        uptime = _collect_command(
+            [powershell, "-NoProfile", "-NonInteractive", "-Command", uptime_expression],
+            parse_json_object,
+            runner,
+            timeout,
+        )
     python_result = CheckResult.success(
         {
             "version": platform.python_version(),
@@ -148,7 +234,7 @@ def collect_snapshot(runner: Runner = run_command, timeout: float = 5.0) -> Snap
     nvidia_result = _collect_command(
         [
             "nvidia-smi",
-            "--query-gpu=name,driver_version,memory.total",
+            "--query-gpu=name,driver_version,memory.total,utilization.gpu,temperature.gpu",
             "--format=csv,noheader,nounits",
         ],
         parse_nvidia_csv,
@@ -163,4 +249,12 @@ def collect_snapshot(runner: Runner = run_command, timeout: float = 5.0) -> Snap
         python=python_result,
         git=git_result,
         nvidia_gpu=nvidia_result,
+        system=system,
+        bios=bios,
+        memory_modules=memory_modules,
+        physical_disks=physical_disks,
+        uptime=uptime,
+        schema_version="1.0",
+        collected_at_utc=datetime.now(UTC).isoformat(),
+        hostname=platform.node(),
     )

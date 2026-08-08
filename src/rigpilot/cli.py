@@ -36,6 +36,15 @@ def _format_success(name: str, data: Any) -> list[str]:
                 "OSArchitecture": "Architecture",
             },
         )
+    if name == "bios":
+        return _format_fields(
+            data,
+            {
+                "Manufacturer": "Manufacturer",
+                "SMBIOSBIOSVersion": "Version",
+                "ReleaseDate": "Release date",
+            },
+        )
     if name == "cpu":
         lines = []
         for index, cpu in enumerate(data, start=1):
@@ -61,6 +70,30 @@ def _format_success(name: str, data: Any) -> list[str]:
             lines.append(f"    Total: {_format_binary_size(int(disk['Size']))}")
             lines.append(f"    Free: {_format_binary_size(int(disk['FreeSpace']))}")
         return lines or ["  No fixed disks reported"]
+    if name == "memory_modules":
+        lines = []
+        for index, module in enumerate(data, start=1):
+            lines.append(f"  Module {index}: {str(module.get('PartNumber', 'Unknown')).strip()}")
+            lines.append(f"    Manufacturer: {str(module.get('Manufacturer', 'Unknown')).strip()}")
+            lines.append(f"    Capacity: {_format_binary_size(int(module['Capacity']))}")
+            lines.append(
+                f"    Speed: {module.get('ConfiguredClockSpeed') or module.get('Speed')} MT/s"
+            )
+        return lines or ["  No physical memory modules reported"]
+    if name == "physical_disks":
+        lines = []
+        for index, disk in enumerate(data, start=1):
+            lines.append(f"  Disk {index}: {str(disk.get('Model', 'Unknown')).strip()}")
+            lines.append(f"    Interface: {disk.get('InterfaceType', 'Unknown')}")
+            lines.append(f"    Capacity: {_format_binary_size(int(disk['Size']))}")
+            lines.append(f"    Reported status: {disk.get('Status', 'Unknown')}")
+        return lines or ["  No physical disks reported"]
+    if name == "uptime":
+        seconds = int(data["UptimeSeconds"])
+        days, remainder = divmod(seconds, 86_400)
+        hours, remainder = divmod(remainder, 3_600)
+        minutes = remainder // 60
+        return [f"  {days}d {hours}h {minutes}m"]
     if name == "nvidia_gpu":
         lines = []
         for index, gpu in enumerate(data, start=1):
@@ -68,6 +101,18 @@ def _format_success(name: str, data: Any) -> list[str]:
             lines.append(f"  {label}: {gpu['name']}")
             lines.append(f"    Driver: {gpu['driver_version']}")
             lines.append(f"    Memory: {gpu['memory_total_mib']} MiB")
+            utilization = gpu.get("utilization_gpu_percent")
+            temperature = gpu.get("temperature_celsius")
+            lines.append(
+                f"    Utilization: {utilization}%"
+                if utilization is not None
+                else "    Utilization: unavailable"
+            )
+            lines.append(
+                f"    Temperature: {temperature} °C"
+                if temperature is not None
+                else "    Temperature: unavailable"
+            )
         return lines or ["  No NVIDIA GPUs reported"]
     if isinstance(data, dict):
         return _format_fields(data, {})
@@ -75,7 +120,12 @@ def _format_success(name: str, data: Any) -> list[str]:
 
 
 def render_human(snapshot: Snapshot) -> str:
-    lines = ["RigPilot system snapshot"]
+    lines = [
+        "RigPilot system snapshot",
+        f"Schema: {snapshot.schema_version}",
+        f"Collected: {snapshot.collected_at_utc or 'Unknown'}",
+        f"Host: {snapshot.hostname or 'Unknown'}",
+    ]
     labels = {
         "operating_system": "Operating system",
         "cpu": "CPU",
@@ -84,10 +134,15 @@ def render_human(snapshot: Snapshot) -> str:
         "python": "Python",
         "git": "Git",
         "nvidia_gpu": "NVIDIA GPU",
+        "system": "System",
+        "bios": "BIOS",
+        "memory_modules": "Memory modules",
+        "physical_disks": "Physical disks",
+        "uptime": "Uptime",
     }
-    for name, result in snapshot.__dict__.items():
+    for name, result in snapshot.checks().items():
         assert isinstance(result, CheckResult)
-        lines.append(f"{labels[name]} [{result.status}]")
+        lines.append(f"{labels[name]} [{result.status}] ({result.duration_ms:.1f} ms)")
         if result.status is CheckStatus.SUCCESS:
             lines.extend(_format_success(name, result.data))
         else:

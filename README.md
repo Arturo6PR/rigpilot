@@ -1,8 +1,8 @@
 # RigPilot
 
 RigPilot is a Windows-first workstation intelligence assistant. It provides a safe, read-only
-system inventory covering the operating system, CPU, memory, fixed storage, Python, Git, and
-NVIDIA GPUs.
+system inventory covering the operating system, system model, BIOS, CPU, physical memory,
+logical and physical storage, uptime, Python, Git, and NVIDIA GPUs.
 
 ## Principles
 
@@ -60,6 +60,12 @@ JSON preserves the source units for automation: Windows memory fields are KiB, s
 bytes, and `memory_total_mib` from NVIDIA is MiB. CPU data is always an array because Windows can
 report more than one physical processor.
 
+JSON snapshots use schema version `1.0` and include the UTC collection timestamp, hostname, and
+per-check duration. The schema is published at `docs/snapshot.schema.json`. Hostnames, hardware
+serial-like identifiers, filesystem labels, and executable paths can be sensitive; inspect JSON
+before sharing it. RigPilot keeps snapshots local unless the user explicitly redirects or uploads
+the output.
+
 ## Development checks
 
 Run the standard-library unit tests, Ruff, and package import check:
@@ -75,6 +81,7 @@ assembly, and both output modes.
 ## Current limitations
 
 - Windows 11 and PowerShell are the primary supported environment.
+- Disk `Status` is the value exposed by Windows CIM, not a complete SMART health assessment.
 - The snapshot is local and point-in-time; RigPilot does not send telemetry anywhere.
 - Inventory only reports information. It does not optimize settings or modify drivers, firmware,
   the registry, services, startup items, or power plans.

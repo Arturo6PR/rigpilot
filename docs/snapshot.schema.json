@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rigpilot:schema:snapshot:1.0",
+  "title": "RigPilot system snapshot",
+  "type": "object",
+  "required": ["schema_version", "collected_at_utc", "hostname", "checks"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "collected_at_utc": { "type": "string", "format": "date-time" },
+    "hostname": { "type": "string" },
+    "checks": {
+      "type": "object",
+      "required": [
+        "operating_system",
+        "cpu",
+        "memory",
+        "storage",
+        "python",
+        "git",
+        "nvidia_gpu",
+        "system",
+        "bios",
+        "memory_modules",
+        "physical_disks",
+        "uptime"
+      ],
+      "properties": {
+        "operating_system": { "$ref": "#/$defs/checkResult" },
+        "cpu": { "$ref": "#/$defs/checkResult" },
+        "memory": { "$ref": "#/$defs/checkResult" },
+        "storage": { "$ref": "#/$defs/checkResult" },
+        "python": { "$ref": "#/$defs/checkResult" },
+        "git": { "$ref": "#/$defs/checkResult" },
+        "nvidia_gpu": { "$ref": "#/$defs/checkResult" },
+        "system": { "$ref": "#/$defs/checkResult" },
+        "bios": { "$ref": "#/$defs/checkResult" },
+        "memory_modules": { "$ref": "#/$defs/checkResult" },
+        "physical_disks": { "$ref": "#/$defs/checkResult" },
+        "uptime": { "$ref": "#/$defs/checkResult" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "checkResult": {
+      "type": "object",
+      "required": ["status", "data", "message", "duration_ms"],
+      "properties": {
+        "status": { "enum": ["success", "unavailable", "failed"] },
+        "data": {},
+        "message": { "type": ["string", "null"] },
+        "duration_ms": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

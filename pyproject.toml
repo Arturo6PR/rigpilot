@@ -9,7 +9,7 @@ dependencies = []
 rigpilot = "rigpilot.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["jsonschema[format]>=4.23", "pytest>=8", "ruff>=0.6"]
 
 [build-system]
 requires = ["hatchling"]

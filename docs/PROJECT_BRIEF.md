@@ -27,3 +27,5 @@ A tested, read-only CLI system snapshot with human-readable and JSON output.
 The first milestone is implemented as a Python CLI with human-readable and JSON output. Every
 probe is independently marked as successful, unavailable, or failed. External commands are
 shell-free and bounded by a configurable timeout, and NVIDIA tooling is optional.
+Schema version 1.0 adds collection metadata, per-check durations, hardware identity, BIOS,
+physical memory, physical disks, uptime, and optional live NVIDIA utilization and temperature.

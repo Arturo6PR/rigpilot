@@ -31,6 +31,8 @@ def sample_snapshot() -> Snapshot:
         python=CheckResult.success({"version": "3.12.0"}),
         git=CheckResult.success({"version": "2.51.0"}),
         nvidia_gpu=CheckResult.unavailable("Command not found: nvidia-smi"),
+        collected_at_utc="2026-08-08T17:00:00+00:00",
+        hostname="TEST-HOST",
     )
 
 
@@ -53,7 +55,8 @@ class CliTests(unittest.TestCase):
 
         payload = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0)
-        self.assertEqual(payload["operating_system"]["status"], "success")
+        self.assertEqual(payload["checks"]["operating_system"]["status"], "success")
+        self.assertEqual(payload["schema_version"], "1.0")
         collect.assert_called_once_with(timeout=2.0)
 
     @patch("rigpilot.cli.collect_snapshot")

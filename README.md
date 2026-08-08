@@ -47,6 +47,15 @@ Structured JSON output:
 .\.venv\Scripts\python.exe -m rigpilot --json
 ```
 
+Redact the hostname, volume labels, and Python executable path before sharing:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot --json --redact
+```
+
+Use `--no-hostname` to emit a schema-compatible `null` hostname. These options change only the
+rendered output; they do not mutate the collected snapshot or any workstation setting.
+
 Change the per-command timeout when needed:
 
 ```powershell

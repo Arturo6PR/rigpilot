@@ -10,7 +10,7 @@ import re
 import shutil
 import sys
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from rigpilot.models import CheckResult, CheckStatus, Snapshot
@@ -42,13 +42,38 @@ def parse_storage(output: str) -> list[dict[str, Any]]:
 
 def parse_bios(output: str) -> dict[str, Any]:
     data = parse_json_object(output)
-    release_date = data.get("ReleaseDate")
-    if isinstance(release_date, str):
-        match = re.fullmatch(r"/Date\((-?\d+)(?:[+-]\d+)?\)/", release_date)
-        if match:
-            timestamp = int(match.group(1)) / 1000
-            data["ReleaseDate"] = datetime.fromtimestamp(timestamp, UTC).date().isoformat()
+    data["ReleaseDate"] = normalize_bios_date(data.get("ReleaseDate"))
     return data
+
+
+def normalize_bios_date(value: Any) -> str | None:
+    """Normalize CIM/PowerShell BIOS dates to an ISO calendar date."""
+
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TypeError("BIOS release date must be a string or null")
+    value = value.strip()
+    if not value:
+        return None
+
+    legacy_match = re.fullmatch(r"/Date\((-?\d+)(?:[+-]\d{4})?\)/", value)
+    if legacy_match:
+        try:
+            timestamp = int(legacy_match.group(1)) / 1000
+            return datetime.fromtimestamp(timestamp, UTC).date().isoformat()
+        except (OSError, OverflowError, ValueError) as exc:
+            raise ValueError("invalid legacy BIOS release date") from exc
+
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            return date.fromisoformat(value).isoformat()
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is None:
+            raise ValueError("ISO BIOS date-time must include an offset or Z")
+        return parsed.date().isoformat()
+    except ValueError as exc:
+        raise ValueError("invalid BIOS release date") from exc
 
 
 def parse_git_version(output: str) -> dict[str, str]:

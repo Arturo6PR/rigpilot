@@ -4,8 +4,6 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from rigpilot.models import CheckResult, Snapshot
-
 CHECK_NAMES = {
     "operating_system",
     "cpu",
@@ -22,32 +20,16 @@ CHECK_NAMES = {
 }
 
 
-def complete_snapshot(result: CheckResult) -> Snapshot:
-    return Snapshot(
-        operating_system=result,
-        cpu=result,
-        memory=result,
-        storage=result,
-        python=result,
-        git=result,
-        nvidia_gpu=result,
-        system=result,
-        bios=result,
-        memory_modules=result,
-        physical_disks=result,
-        uptime=result,
-        schema_version="1.0",
-        collected_at_utc="2026-08-08T17:00:00+00:00",
-        hostname="TEST-HOST",
-    )
-
-
 class SnapshotSchemaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         schema_path = Path(__file__).parents[1] / "docs" / "snapshot.schema.json"
+        cls.fixtures_path = Path(__file__).parent / "fixtures"
         cls.schema = json.loads(schema_path.read_text(encoding="utf-8"))
         cls.validator = Draft202012Validator(cls.schema, format_checker=FormatChecker())
+
+    def load_fixture(self, name: str) -> dict:
+        return json.loads((self.fixtures_path / name).read_text(encoding="utf-8"))
 
     def test_schema_is_valid_draft_2020_12(self) -> None:
         Draft202012Validator.check_schema(self.schema)
@@ -60,9 +42,32 @@ class SnapshotSchemaTests(unittest.TestCase):
         self.assertFalse(checks_schema["additionalProperties"])
 
     def test_complete_success_snapshot_validates(self) -> None:
-        snapshot = complete_snapshot(CheckResult.success({"sample": True}))
-        self.validator.validate(snapshot.to_dict())
+        payload = self.load_fixture("snapshot-success-v1.json")
+        self.validator.validate(payload)
+        self.assertEqual(set(payload["checks"]), CHECK_NAMES)
 
     def test_complete_failure_snapshot_validates(self) -> None:
-        snapshot = complete_snapshot(CheckResult.failed("probe failed safely"))
-        self.validator.validate(snapshot.to_dict())
+        payload = self.load_fixture("snapshot-failure-v1.json")
+        self.validator.validate(payload)
+        self.assertTrue(all(check["status"] == "failed" for check in payload["checks"].values()))
+
+    def test_success_payload_shape_is_enforced(self) -> None:
+        payload = self.load_fixture("snapshot-success-v1.json")
+        del payload["checks"]["cpu"]["data"][0]["NumberOfCores"]
+        self.assertFalse(self.validator.is_valid(payload))
+
+    def test_failed_and_unavailable_results_reject_non_null_data(self) -> None:
+        for status in ("failed", "unavailable"):
+            with self.subTest(status=status):
+                payload = self.load_fixture("snapshot-failure-v1.json")
+                payload["checks"]["cpu"]["status"] = status
+                payload["checks"]["cpu"]["data"] = {"unexpected": True}
+                self.assertFalse(self.validator.is_valid(payload))
+
+    def test_failed_and_unavailable_results_reject_empty_messages(self) -> None:
+        for status in ("failed", "unavailable"):
+            with self.subTest(status=status):
+                payload = self.load_fixture("snapshot-failure-v1.json")
+                payload["checks"]["cpu"]["status"] = status
+                payload["checks"]["cpu"]["message"] = ""
+                self.assertFalse(self.validator.is_valid(payload))

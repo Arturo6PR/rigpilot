@@ -71,10 +71,20 @@ class Snapshot:
             if isinstance(getattr(self, field.name), CheckResult)
         }
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, *, redact: bool = False, include_hostname: bool = True) -> dict[str, Any]:
+        checks = {name: result.to_dict() for name, result in self.checks().items()}
+        if redact:
+            python_data = checks["python"]["data"]
+            if isinstance(python_data, dict) and python_data.get("executable"):
+                python_data["executable"] = "[redacted]"
+            storage_data = checks["storage"]["data"]
+            if isinstance(storage_data, list):
+                for disk in storage_data:
+                    if isinstance(disk, dict) and disk.get("VolumeName"):
+                        disk["VolumeName"] = "[redacted]"
         return {
             "schema_version": self.schema_version,
             "collected_at_utc": self.collected_at_utc,
-            "hostname": self.hostname,
-            "checks": {name: result.to_dict() for name, result in self.checks().items()},
+            "hostname": None if not include_hostname else "[redacted]" if redact else self.hostname,
+            "checks": checks,
         }

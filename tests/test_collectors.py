@@ -4,6 +4,7 @@ from unittest.mock import patch
 from rigpilot.collectors import (
     _powershell_executable,
     collect_snapshot,
+    normalize_bios_date,
     parse_bios,
     parse_git_version,
     parse_json_object,
@@ -29,6 +30,26 @@ class ParserTests(unittest.TestCase):
     def test_bios_normalizes_legacy_powershell_date(self) -> None:
         output = '{"Manufacturer":"Maker","ReleaseDate":"/Date(1782691200000)/"}'
         self.assertEqual(parse_bios(output)["ReleaseDate"], "2026-06-29")
+
+    def test_bios_normalizes_iso_date_times(self) -> None:
+        cases = {
+            "2026-06-29T04:30:00Z": "2026-06-29",
+            "2026-06-29T23:30:00-04:00": "2026-06-29",
+            "2026-06-29T04:30:00+00:00": "2026-06-29",
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(normalize_bios_date(value), expected)
+
+    def test_bios_preserves_date_only_and_null_values(self) -> None:
+        self.assertEqual(normalize_bios_date("2026-06-29"), "2026-06-29")
+        self.assertIsNone(normalize_bios_date(None))
+        self.assertIsNone(normalize_bios_date(""))
+
+    def test_bios_rejects_malformed_nonempty_dates(self) -> None:
+        for value in ("not-a-date", "2026-13-40", "2026-06-29T04:30:00"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                normalize_bios_date(value)
 
     def test_json_objects_supports_multiple_cpus(self) -> None:
         output = '[{"Name":"CPU 1"},{"Name":"CPU 2"}]'

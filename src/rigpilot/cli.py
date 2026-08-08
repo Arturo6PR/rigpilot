@@ -119,12 +119,13 @@ def _format_success(name: str, data: Any) -> list[str]:
     return [f"  {data}"]
 
 
-def render_human(snapshot: Snapshot) -> str:
+def render_human(snapshot: Snapshot, *, redact: bool = False, include_hostname: bool = True) -> str:
+    payload = snapshot.to_dict(redact=redact, include_hostname=include_hostname)
     lines = [
         "RigPilot system snapshot",
         f"Schema: {snapshot.schema_version}",
         f"Collected: {snapshot.collected_at_utc or 'Unknown'}",
-        f"Host: {snapshot.hostname or 'Unknown'}",
+        f"Host: {payload['hostname'] if payload['hostname'] is not None else 'Not included'}",
     ]
     labels = {
         "operating_system": "Operating system",
@@ -144,7 +145,7 @@ def render_human(snapshot: Snapshot) -> str:
         assert isinstance(result, CheckResult)
         lines.append(f"{labels[name]} [{result.status}] ({result.duration_ms:.1f} ms)")
         if result.status is CheckStatus.SUCCESS:
-            lines.extend(_format_success(name, result.data))
+            lines.extend(_format_success(name, payload["checks"][name]["data"]))
         else:
             lines.append(f"  {result.message or 'No details'}")
     return "\n".join(lines)
@@ -153,6 +154,14 @@ def render_human(snapshot: Snapshot) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Collect a read-only Windows system snapshot.")
     parser.add_argument("--json", action="store_true", help="emit structured JSON output")
+    parser.add_argument(
+        "--redact",
+        action="store_true",
+        help="redact hostname, volume labels, and the Python executable path",
+    )
+    parser.add_argument(
+        "--no-hostname", action="store_true", help="omit the hostname value from output"
+    )
     parser.add_argument(
         "--timeout", type=float, default=5.0, help="per-command timeout in seconds (default: 5)"
     )
@@ -165,7 +174,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         build_parser().error("--timeout must be finite and greater than zero")
     snapshot = collect_snapshot(timeout=args.timeout)
     if args.json:
-        print(json.dumps(snapshot.to_dict(), indent=2, ensure_ascii=False))
+        print(
+            json.dumps(
+                snapshot.to_dict(redact=args.redact, include_hostname=not args.no_hostname),
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
     else:
-        print(render_human(snapshot))
+        print(render_human(snapshot, redact=args.redact, include_hostname=not args.no_hostname))
     return 0

@@ -28,7 +28,13 @@ def sample_snapshot() -> Snapshot:
                 }
             ]
         ),
-        python=CheckResult.success({"version": "3.12.0"}),
+        python=CheckResult.success(
+            {
+                "version": "3.12.0",
+                "implementation": "CPython",
+                "executable": "C:\\Python\\python.exe",
+            }
+        ),
         git=CheckResult.success({"version": "2.51.0"}),
         nvidia_gpu=CheckResult.unavailable("Command not found: nvidia-smi"),
         collected_at_utc="2026-08-08T17:00:00+00:00",
@@ -58,6 +64,28 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["checks"]["operating_system"]["status"], "success")
         self.assertEqual(payload["schema_version"], "1.0")
         collect.assert_called_once_with(timeout=2.0)
+
+    def test_json_redaction_does_not_mutate_snapshot(self) -> None:
+        snapshot = sample_snapshot()
+        with patch("rigpilot.cli.collect_snapshot", return_value=snapshot):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                main(["--json", "--redact"])
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["hostname"], "[redacted]")
+        self.assertEqual(payload["checks"]["storage"]["data"][0]["VolumeName"], "[redacted]")
+        self.assertEqual(payload["checks"]["python"]["data"]["executable"], "[redacted]")
+        self.assertEqual(snapshot.hostname, "TEST-HOST")
+        self.assertEqual(snapshot.storage.data[0]["VolumeName"], "System")
+
+    @patch("rigpilot.cli.collect_snapshot", return_value=sample_snapshot())
+    def test_no_hostname_emits_schema_compatible_null(self, _collect) -> None:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            main(["--json", "--no-hostname"])
+
+        self.assertIsNone(json.loads(stdout.getvalue())["hostname"])
 
     @patch("rigpilot.cli.collect_snapshot")
     def test_invalid_timeouts_are_rejected_before_collection(self, collect) -> None:

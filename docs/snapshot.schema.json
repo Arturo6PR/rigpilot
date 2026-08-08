@@ -7,36 +7,23 @@
   "properties": {
     "schema_version": { "const": "1.0" },
     "collected_at_utc": { "type": "string", "format": "date-time" },
-    "hostname": { "type": "string" },
+    "hostname": { "type": ["string", "null"] },
     "checks": {
       "type": "object",
-      "required": [
-        "operating_system",
-        "cpu",
-        "memory",
-        "storage",
-        "python",
-        "git",
-        "nvidia_gpu",
-        "system",
-        "bios",
-        "memory_modules",
-        "physical_disks",
-        "uptime"
-      ],
+      "required": ["operating_system", "cpu", "memory", "storage", "python", "git", "nvidia_gpu", "system", "bios", "memory_modules", "physical_disks", "uptime"],
       "properties": {
-        "operating_system": { "$ref": "#/$defs/checkResult" },
-        "cpu": { "$ref": "#/$defs/checkResult" },
-        "memory": { "$ref": "#/$defs/checkResult" },
-        "storage": { "$ref": "#/$defs/checkResult" },
-        "python": { "$ref": "#/$defs/checkResult" },
-        "git": { "$ref": "#/$defs/checkResult" },
-        "nvidia_gpu": { "$ref": "#/$defs/checkResult" },
-        "system": { "$ref": "#/$defs/checkResult" },
-        "bios": { "$ref": "#/$defs/checkResult" },
-        "memory_modules": { "$ref": "#/$defs/checkResult" },
-        "physical_disks": { "$ref": "#/$defs/checkResult" },
-        "uptime": { "$ref": "#/$defs/checkResult" }
+        "operating_system": { "$ref": "#/$defs/operatingSystemResult" },
+        "cpu": { "$ref": "#/$defs/cpuResult" },
+        "memory": { "$ref": "#/$defs/memoryResult" },
+        "storage": { "$ref": "#/$defs/storageResult" },
+        "python": { "$ref": "#/$defs/pythonResult" },
+        "git": { "$ref": "#/$defs/gitResult" },
+        "nvidia_gpu": { "$ref": "#/$defs/nvidiaResult" },
+        "system": { "$ref": "#/$defs/systemResult" },
+        "bios": { "$ref": "#/$defs/biosResult" },
+        "memory_modules": { "$ref": "#/$defs/memoryModulesResult" },
+        "physical_disks": { "$ref": "#/$defs/physicalDisksResult" },
+        "uptime": { "$ref": "#/$defs/uptimeResult" }
       },
       "additionalProperties": false
     }
@@ -53,6 +40,35 @@
         "duration_ms": { "type": "number", "minimum": 0 }
       },
       "additionalProperties": false
+    },
+    "operatingSystemData": { "type": "object", "required": ["Caption", "Version", "BuildNumber", "OSArchitecture"], "properties": { "Caption": { "type": "string" }, "Version": { "type": "string" }, "BuildNumber": { "type": "string" }, "OSArchitecture": { "type": "string" } }, "additionalProperties": false },
+    "cpuData": { "type": "array", "items": { "type": "object", "required": ["Name", "NumberOfCores", "NumberOfLogicalProcessors"], "properties": { "Name": { "type": "string" }, "NumberOfCores": { "type": "integer", "minimum": 0 }, "NumberOfLogicalProcessors": { "type": "integer", "minimum": 0 } }, "additionalProperties": false } },
+    "memoryData": { "type": "object", "required": ["TotalVisibleMemorySize", "FreePhysicalMemory"], "properties": { "TotalVisibleMemorySize": { "type": "integer", "minimum": 0 }, "FreePhysicalMemory": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
+    "storageData": { "type": "array", "items": { "type": "object", "required": ["DeviceID", "VolumeName", "Size", "FreeSpace"], "properties": { "DeviceID": { "type": "string" }, "VolumeName": { "type": ["string", "null"] }, "Size": { "type": "integer", "minimum": 0 }, "FreeSpace": { "type": "integer", "minimum": 0 } }, "additionalProperties": false } },
+    "pythonData": { "type": "object", "required": ["version", "implementation", "executable"], "properties": { "version": { "type": "string" }, "implementation": { "type": "string" }, "executable": { "type": "string" } }, "additionalProperties": false },
+    "gitData": { "type": "object", "required": ["version"], "properties": { "version": { "type": "string" } }, "additionalProperties": false },
+    "nvidiaData": { "type": "array", "items": { "type": "object", "required": ["name", "driver_version", "memory_total_mib", "utilization_gpu_percent", "temperature_celsius"], "properties": { "name": { "type": "string" }, "driver_version": { "type": "string" }, "memory_total_mib": { "type": "integer", "minimum": 0 }, "utilization_gpu_percent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 }, "temperature_celsius": { "type": ["integer", "null"] } }, "additionalProperties": false } },
+    "systemData": { "type": "object", "required": ["Manufacturer", "Model"], "properties": { "Manufacturer": { "type": ["string", "null"] }, "Model": { "type": ["string", "null"] } }, "additionalProperties": false },
+    "biosData": { "type": "object", "required": ["Manufacturer", "SMBIOSBIOSVersion", "ReleaseDate"], "properties": { "Manufacturer": { "type": ["string", "null"] }, "SMBIOSBIOSVersion": { "type": ["string", "null"] }, "ReleaseDate": { "type": ["string", "null"], "format": "date" } }, "additionalProperties": false },
+    "memoryModulesData": { "type": "array", "items": { "type": "object", "required": ["Manufacturer", "PartNumber", "Capacity", "Speed", "ConfiguredClockSpeed"], "properties": { "Manufacturer": { "type": ["string", "null"] }, "PartNumber": { "type": ["string", "null"] }, "Capacity": { "type": "integer", "minimum": 0 }, "Speed": { "type": ["integer", "null"], "minimum": 0 }, "ConfiguredClockSpeed": { "type": ["integer", "null"], "minimum": 0 } }, "additionalProperties": false } },
+    "physicalDisksData": { "type": "array", "items": { "type": "object", "required": ["Model", "InterfaceType", "MediaType", "Size", "Status"], "properties": { "Model": { "type": ["string", "null"] }, "InterfaceType": { "type": ["string", "null"] }, "MediaType": { "type": ["string", "null"] }, "Size": { "type": "integer", "minimum": 0 }, "Status": { "type": ["string", "null"] } }, "additionalProperties": false } },
+    "uptimeData": { "type": "object", "required": ["UptimeSeconds"], "properties": { "UptimeSeconds": { "type": "integer", "minimum": 0 } }, "additionalProperties": false },
+    "operatingSystemResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/operatingSystemData" } } } }] },
+    "cpuResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/cpuData" } } } }] },
+    "memoryResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/memoryData" } } } }] },
+    "storageResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/storageData" } } } }] },
+    "pythonResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/pythonData" } } } }] },
+    "gitResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/gitData" } } } }] },
+    "nvidiaResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/nvidiaData" } } } }] },
+    "systemResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/systemData" } } } }] },
+    "biosResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/biosData" } } } }] },
+    "memoryModulesResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/memoryModulesData" } } } }] },
+    "physicalDisksResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/physicalDisksData" } } } }] },
+    "uptimeResult": { "$ref": "#/$defs/checkResult", "allOf": [{ "$ref": "#/$defs/successOrError" }, { "if": { "properties": { "status": { "const": "success" } } }, "then": { "properties": { "data": { "$ref": "#/$defs/uptimeData" } } } }] },
+    "successOrError": {
+      "if": { "properties": { "status": { "const": "success" } } },
+      "then": { "properties": { "message": { "type": "null" } } },
+      "else": { "properties": { "data": { "type": "null" }, "message": { "type": "string", "minLength": 1 } } }
     }
   }
 }

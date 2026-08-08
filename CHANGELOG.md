@@ -5,6 +5,12 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Added
+
+- Deterministic, privacy-safe assessment of saved snapshots with probe coverage, disk capacity,
+  hardware-change, and BIOS-age findings.
+- Versioned assessment schema with human-readable and JSON output.
+
 ## [0.2.0] - 2026-08-08
 
 ### Added

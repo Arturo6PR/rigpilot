@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rigpilot:schema:assessment:1.0",
+  "title": "RigPilot assessment",
+  "type": "object",
+  "required": ["assessment_schema_version", "snapshot_schema_version", "subject_collected_at_utc", "baseline_collected_at_utc", "summary", "findings"],
+  "properties": {
+    "assessment_schema_version": { "const": "1.0" },
+    "snapshot_schema_version": { "const": "1.0" },
+    "subject_collected_at_utc": { "type": "string", "format": "date-time" },
+    "baseline_collected_at_utc": { "type": ["string", "null"], "format": "date-time" },
+    "summary": {
+      "type": "object",
+      "required": ["highest_severity", "counts"],
+      "properties": {
+        "highest_severity": { "enum": ["info", "warning", "critical", null] },
+        "counts": {
+          "type": "object",
+          "required": ["info", "warning", "critical"],
+          "properties": {
+            "info": { "type": "integer", "minimum": 0 },
+            "warning": { "type": "integer", "minimum": 0 },
+            "critical": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "findingBase": {
+      "type": "object",
+      "required": ["rule_id", "severity", "check", "subject", "message", "evidence"],
+      "properties": {
+        "rule_id": { "type": "string" },
+        "severity": { "enum": ["info", "warning", "critical"] },
+        "check": { "type": "string" },
+        "subject": { "type": ["string", "null"] },
+        "message": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "probeFinding": {
+      "allOf": [
+        { "$ref": "#/$defs/findingBase" },
+        {
+          "properties": {
+            "rule_id": { "enum": ["probe.skipped", "probe.optional_unavailable", "probe.unavailable", "probe.failed"] },
+            "check": { "enum": ["operating_system", "cpu", "memory", "storage", "python", "git", "nvidia_gpu", "system", "bios", "memory_modules", "physical_disks", "uptime"] },
+            "subject": { "type": "null" },
+            "evidence": {
+              "type": "object",
+              "required": ["status"],
+              "properties": { "status": { "enum": ["unavailable", "failed"] } },
+              "additionalProperties": false
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "rule_id": { "enum": ["probe.skipped", "probe.optional_unavailable"] } } },
+              "then": { "properties": { "severity": { "const": "info" } } }
+            },
+            {
+              "if": { "properties": { "rule_id": { "enum": ["probe.unavailable", "probe.failed"] } } },
+              "then": { "properties": { "severity": { "const": "warning" } } }
+            },
+            {
+              "if": { "properties": { "rule_id": { "const": "probe.failed" } } },
+              "then": { "properties": { "evidence": { "properties": { "status": { "const": "failed" } } } } }
+            },
+            {
+              "if": { "properties": { "rule_id": { "enum": ["probe.skipped", "probe.optional_unavailable", "probe.unavailable"] } } },
+              "then": { "properties": { "evidence": { "properties": { "status": { "const": "unavailable" } } } } }
+            }
+          ]
+        }
+      ]
+    },
+    "storageFinding": {
+      "allOf": [
+        { "$ref": "#/$defs/findingBase" },
+        {
+          "properties": {
+            "rule_id": { "enum": ["storage.low_capacity", "storage.critically_low_capacity"] },
+            "check": { "const": "storage" },
+            "subject": { "type": "string", "pattern": "^[A-Za-z]:$" },
+            "evidence": {
+              "type": "object",
+              "required": ["free_bytes", "total_bytes", "free_percent"],
+              "properties": {
+                "free_bytes": { "type": "integer", "minimum": 0 },
+                "total_bytes": { "type": "integer", "minimum": 1 },
+                "free_percent": { "type": "number", "minimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "rule_id": { "const": "storage.low_capacity" } } },
+              "then": { "properties": { "severity": { "const": "warning" } } }
+            },
+            {
+              "if": { "properties": { "rule_id": { "const": "storage.critically_low_capacity" } } },
+              "then": { "properties": { "severity": { "const": "critical" } } }
+            }
+          ]
+        }
+      ]
+    },
+    "hardwareFinding": {
+      "allOf": [
+        { "$ref": "#/$defs/findingBase" },
+        {
+          "properties": {
+            "rule_id": { "enum": ["hardware.system_changed", "hardware.cpu_changed", "hardware.memory_changed", "hardware.physical_disks_changed", "hardware.nvidia_gpu_changed"] },
+            "severity": { "const": "warning" },
+            "check": { "enum": ["system", "cpu", "memory_modules", "physical_disks", "nvidia_gpu"] },
+            "subject": { "type": "null" },
+            "evidence": {
+              "type": "object",
+              "required": ["baseline_count", "current_count"],
+              "properties": {
+                "baseline_count": { "type": "integer", "minimum": 0 },
+                "current_count": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "oneOf": [
+            { "properties": { "rule_id": { "const": "hardware.system_changed" }, "check": { "const": "system" } } },
+            { "properties": { "rule_id": { "const": "hardware.cpu_changed" }, "check": { "const": "cpu" } } },
+            { "properties": { "rule_id": { "const": "hardware.memory_changed" }, "check": { "const": "memory_modules" } } },
+            { "properties": { "rule_id": { "const": "hardware.physical_disks_changed" }, "check": { "const": "physical_disks" } } },
+            { "properties": { "rule_id": { "const": "hardware.nvidia_gpu_changed" }, "check": { "const": "nvidia_gpu" } } }
+          ]
+        }
+      ]
+    },
+    "biosMissingFinding": {
+      "allOf": [
+        { "$ref": "#/$defs/findingBase" },
+        {
+          "properties": {
+            "rule_id": { "const": "bios.release_date_missing" },
+            "severity": { "const": "info" },
+            "check": { "const": "bios" },
+            "subject": { "type": "null" },
+            "evidence": { "type": "object", "maxProperties": 0 }
+          }
+        }
+      ]
+    },
+    "biosFutureFinding": {
+      "allOf": [
+        { "$ref": "#/$defs/findingBase" },
+        {
+          "properties": {
+            "rule_id": { "const": "bios.release_date_future" },
+            "severity": { "const": "warning" },
+            "check": { "const": "bios" },
+            "subject": { "type": "null" },
+            "evidence": {
+              "type": "object",
+              "required": ["release_date"],
+              "properties": { "release_date": { "type": "string", "format": "date" } },
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+    "biosStaleFinding": {
+      "allOf": [
+        { "$ref": "#/$defs/findingBase" },
+        {
+          "properties": {
+            "rule_id": { "const": "bios.release_date_stale" },
+            "severity": { "const": "warning" },
+            "check": { "const": "bios" },
+            "subject": { "type": "null" },
+            "evidence": {
+              "type": "object",
+              "required": ["release_date", "age_years"],
+              "properties": {
+                "release_date": { "type": "string", "format": "date" },
+                "age_years": { "type": "integer", "minimum": 5 }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+    "finding": {
+      "oneOf": [
+        { "$ref": "#/$defs/probeFinding" },
+        { "$ref": "#/$defs/storageFinding" },
+        { "$ref": "#/$defs/hardwareFinding" },
+        { "$ref": "#/$defs/biosMissingFinding" },
+        { "$ref": "#/$defs/biosFutureFinding" },
+        { "$ref": "#/$defs/biosStaleFinding" }
+      ]
+    }
+  }
+}

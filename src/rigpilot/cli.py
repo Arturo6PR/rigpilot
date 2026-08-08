@@ -10,6 +10,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 
+from rigpilot.assessment import assess_snapshot, render_assessment_human
 from rigpilot.collectors import CHECK_NAMES, collect_snapshot
 from rigpilot.diffing import compare_snapshots, load_snapshot, render_diff_human
 from rigpilot.models import CheckResult, CheckStatus, Snapshot
@@ -218,10 +219,38 @@ def _run_diff(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_assess_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="rigpilot assess", description="Assess a saved JSON snapshot."
+    )
+    parser.add_argument("current", type=Path, help="snapshot JSON file to assess")
+    parser.add_argument("--baseline", type=Path, help="earlier snapshot for hardware comparison")
+    parser.add_argument("--json", action="store_true", help="emit structured JSON output")
+    return parser
+
+
+def _run_assess(argv: Sequence[str]) -> int:
+    args = build_assess_parser().parse_args(argv)
+    try:
+        current = load_snapshot(args.current)
+        baseline = load_snapshot(args.baseline) if args.baseline is not None else None
+        assessment = assess_snapshot(current, baseline)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"rigpilot assess: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(assessment, indent=2, ensure_ascii=False))
+    else:
+        print(render_assessment_human(assessment))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments[:1] == ["diff"]:
         return _run_diff(arguments[1:])
+    if arguments[:1] == ["assess"]:
+        return _run_assess(arguments[1:])
     args = build_parser().parse_args(arguments)
     if not isfinite(args.timeout) or args.timeout <= 0:
         build_parser().error("--timeout must be finite and greater than zero")

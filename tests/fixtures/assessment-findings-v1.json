@@ -1,0 +1,44 @@
+{
+  "assessment_schema_version": "1.0",
+  "snapshot_schema_version": "1.0",
+  "subject_collected_at_utc": "2026-08-08T17:00:00+00:00",
+  "baseline_collected_at_utc": null,
+  "summary": {
+    "highest_severity": "critical",
+    "counts": { "info": 1, "warning": 2, "critical": 1 }
+  },
+  "findings": [
+    {
+      "rule_id": "storage.critically_low_capacity",
+      "severity": "critical",
+      "check": "storage",
+      "subject": "C:",
+      "message": "Fixed volume has critically low free capacity.",
+      "evidence": { "free_bytes": 4294967296, "total_bytes": 1099511627776, "free_percent": 0.4 }
+    },
+    {
+      "rule_id": "bios.release_date_stale",
+      "severity": "warning",
+      "check": "bios",
+      "subject": null,
+      "message": "BIOS release date is at least five years old; review manufacturer guidance.",
+      "evidence": { "release_date": "2020-01-01", "age_years": 6 }
+    },
+    {
+      "rule_id": "probe.failed",
+      "severity": "warning",
+      "check": "cpu",
+      "subject": null,
+      "message": "Inventory probe failed; assessment coverage is incomplete.",
+      "evidence": { "status": "failed" }
+    },
+    {
+      "rule_id": "probe.optional_unavailable",
+      "severity": "info",
+      "check": "nvidia_gpu",
+      "subject": null,
+      "message": "Optional NVIDIA inventory is unavailable.",
+      "evidence": { "status": "unavailable" }
+    }
+  ]
+}

@@ -83,6 +83,26 @@ Both files are strictly validated against snapshot schema 1.0 before comparison.
 are reported without showing either hostname. UTF-8, UTF-8 with BOM, and UTF-16 files with a
 little- or big-endian BOM are supported, including output redirected by Windows PowerShell 5.1.
 
+Assess a saved snapshot without collecting new telemetry:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot assess current.json
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --baseline previous.json
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --baseline previous.json --json
+```
+
+Assessment reports incomplete probe coverage, low fixed-volume capacity, stable hardware identity
+changes, and missing, future, or five-year-old BIOS release dates. Both files are strictly
+validated before assessment. Findings use `info`, `warning`, and `critical` severity and avoid
+hostnames, volume labels, executable paths, raw probe errors, and hardware identity values.
+Assessment reads saved snapshots only: it does not execute system probes or contact vendors.
+
+A fixed volume is `critical` when free space is below both 5% and 10 GiB. It is a `warning` when
+free space is below both 10% and 20 GiB; equality at either boundary does not satisfy that
+threshold. Zero-sized volumes do not produce capacity findings. A BIOS release date becomes stale
+after five complete calendar years. For this calculation, a February 29 anniversary falls on
+February 28 in a non-leap year.
+
 The installed console entry point is also named `rigpilot`.
 
 Human-readable output converts memory and storage sizes to binary units such as GiB and TiB.
@@ -91,7 +111,8 @@ bytes, and `memory_total_mib` from NVIDIA is MiB. CPU data is always an array be
 report more than one physical processor.
 
 JSON snapshots use schema version `1.0` and include the UTC collection timestamp, hostname, and
-per-check duration. The schema is published at `docs/snapshot.schema.json`. Hostnames, hardware
+per-check duration. The schema is published at `docs/snapshot.schema.json`; assessment output has
+its own version `1.0` schema at `docs/assessment.schema.json`. Hostnames, hardware
 serial-like identifiers, filesystem labels, and executable paths can be sensitive; inspect JSON
 before sharing it. RigPilot keeps snapshots local unless the user explicitly redirects or uploads
 the output.
@@ -106,7 +127,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-RigPilot.ps1
 
 Tests cover parsers, missing commands, invalid and expired timeouts, operating-system errors,
 nonzero exits, malformed output, multiple CPUs and GPUs, safe command construction, snapshot
-assembly, collector selection, snapshot comparison, and both output modes.
+assembly, collector selection, snapshot comparison, deterministic assessment rules, privacy,
+schema validation, and output modes.
 
 ## Current limitations
 

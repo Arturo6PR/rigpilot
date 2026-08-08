@@ -10,7 +10,9 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from math import inf, nan
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -32,6 +34,20 @@ def load_fixture(name: str = "snapshot-success-v1.json") -> dict:
 
 def finding_ids(result: dict) -> list[str]:
     return [finding["rule_id"] for finding in result["findings"]]
+
+
+def live_snapshot_model(payload: dict | None = None) -> Mock:
+    source = load_fixture() if payload is None else payload
+    snapshot = Mock()
+
+    def to_dict(*, include_hostname: bool = True) -> dict:
+        result = copy.deepcopy(source)
+        if not include_hostname:
+            result["hostname"] = None
+        return result
+
+    snapshot.to_dict.side_effect = to_dict
+    return snapshot
 
 
 class AssessmentRuleTests(unittest.TestCase):
@@ -468,6 +484,263 @@ class AssessmentCliTests(unittest.TestCase):
             with contextlib.redirect_stdout(stdout):
                 self.assertEqual(main(["assess", str(path), "--json"]), 0)
         self.assertNotIn("PRIVATE-SNAPSHOT-NAME", stdout.getvalue())
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_live_human_collects_once_with_defaults_and_omits_hostname(self, collect) -> None:
+        snapshot = live_snapshot_model()
+        collect.return_value = snapshot
+        stdout = io.StringIO()
+
+        with (
+            patch("rigpilot.cli.assess_snapshot", wraps=assess_snapshot) as assess,
+            contextlib.redirect_stdout(stdout),
+        ):
+            result = main(["assess", "--live"])
+
+        self.assertEqual(result, 0)
+        self.assertIn("No findings detected", stdout.getvalue())
+        collect.assert_called_once_with(timeout=5.0, only=None, skip=None)
+        snapshot.to_dict.assert_called_once_with(include_hostname=False)
+        assess.assert_called_once()
+        self.assertIsNone(assess.call_args.args[0]["hostname"])
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_live_json_is_schema_valid_and_findings_return_zero(self, collect) -> None:
+        current = load_fixture()
+        current["checks"]["storage"]["data"][0]["FreeSpace"] = 4 * GIB
+        collect.return_value = live_snapshot_model(current)
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            result = main(["assess", "--live", "--json"])
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(result, 0)
+        validate_assessment(payload)
+        self.assertIn("storage.critically_low_capacity", finding_ids(payload))
+        collect.assert_called_once()
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_live_baseline_loads_once_and_enables_hardware_comparison(self, collect) -> None:
+        baseline = load_fixture()
+        current = copy.deepcopy(baseline)
+        current["checks"]["cpu"]["data"][0]["NumberOfCores"] += 1
+        collect.return_value = live_snapshot_model(current)
+        stdout = io.StringIO()
+
+        with (
+            patch("rigpilot.cli.load_snapshot", return_value=baseline) as load,
+            contextlib.redirect_stdout(stdout),
+        ):
+            result = main(["assess", "--live", "--baseline", "previous.json", "--json"])
+
+        self.assertEqual(result, 0)
+        self.assertIn("hardware.cpu_changed", finding_ids(json.loads(stdout.getvalue())))
+        load.assert_called_once_with(Path("previous.json"))
+        collect.assert_called_once()
+
+    def test_live_collection_options_are_forwarded_exactly(self) -> None:
+        cases = [
+            (
+                ["--timeout", "10", "--only", "storage,bios"],
+                {"timeout": 10.0, "only": {"storage", "bios"}, "skip": None},
+            ),
+            (
+                ["--skip", "nvidia_gpu"],
+                {"timeout": 5.0, "only": None, "skip": {"nvidia_gpu"}},
+            ),
+        ]
+        for arguments, expected in cases:
+            with (
+                self.subTest(arguments=arguments),
+                patch(
+                    "rigpilot.cli.collect_snapshot", return_value=live_snapshot_model()
+                ) as collect,
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(main(["assess", "--live", *arguments]), 0)
+                collect.assert_called_once_with(**expected)
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_invalid_live_arguments_fail_before_collection(self, collect) -> None:
+        path = str(FIXTURES / "snapshot-success-v1.json")
+        cases = [
+            ["assess"],
+            ["assess", "--live", path],
+            ["assess", path, "--timeout", "1"],
+            ["assess", path, "--only", "cpu"],
+            ["assess", path, "--skip", "cpu"],
+            ["assess", "--live", "--only", "cpu", "--skip", "memory"],
+            ["assess", "--live", "--only", ""],
+            ["assess", "--live", "--only", "registry"],
+        ]
+        cases.extend(
+            ["assess", "--live", "--timeout", str(timeout)] for timeout in (0, -1, nan, inf)
+        )
+        for arguments in cases:
+            with self.subTest(arguments=arguments), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    main(arguments)
+                self.assertEqual(raised.exception.code, 2)
+        collect.assert_not_called()
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_invalid_live_baseline_prevents_collection(self, collect) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            malformed = Path(directory) / "malformed.json"
+            malformed.write_text("{not json", encoding="utf-8")
+            schema_invalid = Path(directory) / "schema-invalid.json"
+            invalid_payload = load_fixture()
+            del invalid_payload["checks"]["bios"]
+            schema_invalid.write_text(json.dumps(invalid_payload), encoding="utf-8")
+            for baseline in (Path(directory) / "missing.json", malformed, schema_invalid):
+                with self.subTest(baseline=baseline):
+                    stderr = io.StringIO()
+                    with contextlib.redirect_stderr(stderr):
+                        result = main(["assess", "--live", "--baseline", str(baseline)])
+                    self.assertEqual(result, 2)
+                    self.assertIn("rigpilot assess:", stderr.getvalue())
+                    self.assertNotIn("Traceback", stderr.getvalue())
+        collect.assert_not_called()
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_invalid_collected_snapshot_fails_concisely(self, collect) -> None:
+        collect.return_value = live_snapshot_model({"private": "SECRET INTERNAL VALUE"})
+        stderr = io.StringIO()
+
+        with contextlib.redirect_stderr(stderr):
+            result = main(["assess", "--live"])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(stderr.getvalue(), "rigpilot assess: live assessment failed\n")
+        self.assertNotIn("SECRET", stderr.getvalue())
+        collect.assert_called_once()
+
+    @patch("rigpilot.cli.collect_snapshot", side_effect=RuntimeError("SECRET COLLECTOR ERROR"))
+    def test_live_collection_error_fails_concisely(self, collect) -> None:
+        stderr = io.StringIO()
+
+        with contextlib.redirect_stderr(stderr):
+            result = main(["assess", "--live"])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(stderr.getvalue(), "rigpilot assess: live assessment failed\n")
+        self.assertNotIn("SECRET", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+        collect.assert_called_once()
+
+    @patch("rigpilot.cli.collect_snapshot", return_value=live_snapshot_model())
+    def test_unexpected_assessment_error_is_private(self, collect) -> None:
+        stderr = io.StringIO()
+
+        with (
+            patch(
+                "rigpilot.cli.assess_snapshot",
+                side_effect=AttributeError("SECRET ASSESSMENT FAILURE"),
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = main(["assess", "--live"])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(stderr.getvalue(), "rigpilot assess: live assessment failed\n")
+        self.assertNotIn("SECRET", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+        collect.assert_called_once()
+
+    @patch("rigpilot.cli.collect_snapshot", return_value=live_snapshot_model())
+    def test_unexpected_rendering_error_is_private(self, collect) -> None:
+        stderr = io.StringIO()
+
+        with (
+            patch(
+                "rigpilot.cli.render_assessment_human",
+                side_effect=KeyError("SECRET RENDERING FAILURE"),
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = main(["assess", "--live"])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(stderr.getvalue(), "rigpilot assess: live assessment failed\n")
+        self.assertNotIn("SECRET", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+        collect.assert_called_once()
+
+    @patch("rigpilot.cli.collect_snapshot", return_value=live_snapshot_model())
+    def test_live_does_not_catch_process_control_exceptions(self, collect) -> None:
+        for exception in (KeyboardInterrupt(), SystemExit(9)):
+            with (
+                self.subTest(exception=type(exception).__name__),
+                patch("rigpilot.cli.assess_snapshot", side_effect=exception),
+                self.assertRaises(type(exception)),
+            ):
+                main(["assess", "--live"])
+        self.assertEqual(collect.call_count, 2)
+
+    def test_saved_mode_loads_current_before_baseline(self) -> None:
+        current = Path("current-invalid.json")
+        baseline = Path("baseline-invalid.json")
+        stderr = io.StringIO()
+
+        with (
+            patch("rigpilot.cli.load_snapshot", side_effect=ValueError("current failed")) as load,
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = main(["assess", str(current), "--baseline", str(baseline)])
+
+        self.assertEqual(result, 2)
+        load.assert_called_once_with(current)
+        self.assertIn("current failed", stderr.getvalue())
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_live_output_excludes_sensitive_inventory_values(self, collect) -> None:
+        current = load_fixture()
+        current["hostname"] = "SECRET-LIVE-HOST"
+        current["checks"]["storage"]["data"][0]["VolumeName"] = "SECRET VOLUME"
+        current["checks"]["python"]["data"]["executable"] = "C:\\SECRET\\python.exe"
+        current["checks"]["git"] = {
+            "status": "failed",
+            "data": None,
+            "message": "SECRET RAW PROBE ERROR",
+            "duration_ms": 1.0,
+        }
+        current["checks"]["cpu"]["data"][0]["Name"] = "SECRET CPU"
+        current["checks"]["memory_modules"]["data"][0]["PartNumber"] = "SECRET RAM"
+        current["checks"]["physical_disks"]["data"][0]["Model"] = "SECRET DISK"
+        current["checks"]["nvidia_gpu"]["data"][0]["name"] = "SECRET GPU"
+        current["checks"]["system"]["data"]["Model"] = "SECRET SYSTEM"
+        secrets = (
+            "SECRET-LIVE-HOST",
+            "SECRET VOLUME",
+            "C:\\SECRET\\python.exe",
+            "SECRET RAW PROBE ERROR",
+            "SECRET CPU",
+            "SECRET RAM",
+            "SECRET DISK",
+            "SECRET GPU",
+            "SECRET SYSTEM",
+        )
+        for output_arguments in ([], ["--json"]):
+            with self.subTest(output_arguments=output_arguments):
+                collect.return_value = live_snapshot_model(current)
+                collect.reset_mock()
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout):
+                    result = main(
+                        [
+                            "assess",
+                            "--live",
+                            "--baseline",
+                            str(FIXTURES / "snapshot-success-v1.json"),
+                            *output_arguments,
+                        ]
+                    )
+
+                self.assertEqual(result, 0)
+                collect.assert_called_once()
+                for secret in secrets:
+                    self.assertNotIn(secret, stdout.getvalue())
 
 
 class InstalledPackageTests(unittest.TestCase):

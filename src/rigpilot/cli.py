@@ -12,7 +12,7 @@ from typing import Any
 
 from rigpilot.assessment import assess_snapshot, render_assessment_human
 from rigpilot.collectors import CHECK_NAMES, collect_snapshot
-from rigpilot.diffing import compare_snapshots, load_snapshot, render_diff_human
+from rigpilot.diffing import compare_snapshots, load_snapshot, render_diff_human, validate_snapshot
 from rigpilot.models import CheckResult, CheckStatus, Snapshot
 
 
@@ -221,23 +221,83 @@ def _run_diff(argv: Sequence[str]) -> int:
 
 def build_assess_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="rigpilot assess", description="Assess a saved JSON snapshot."
+        prog="rigpilot assess", description="Assess a saved or live system snapshot."
     )
-    parser.add_argument("current", type=Path, help="snapshot JSON file to assess")
+    parser.add_argument("current", nargs="?", type=Path, help="saved snapshot JSON file to assess")
+    parser.add_argument(
+        "--live", action="store_true", help="collect and assess one read-only snapshot in memory"
+    )
     parser.add_argument("--baseline", type=Path, help="earlier snapshot for hardware comparison")
     parser.add_argument("--json", action="store_true", help="emit structured JSON output")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
+        "--only",
+        type=_parse_check_names,
+        metavar="CHECKS",
+        help="in live mode, run only comma-separated checks",
+    )
+    selection.add_argument(
+        "--skip",
+        type=_parse_check_names,
+        metavar="CHECKS",
+        help="in live mode, skip comma-separated checks",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        help="in live mode, per-command timeout in seconds (default: 5)",
+    )
     return parser
 
 
+def _collect_assessment_snapshot(
+    *, timeout: float, only: set[str] | None, skip: set[str] | None
+) -> dict[str, Any]:
+    snapshot = collect_snapshot(timeout=timeout, only=only, skip=skip)
+    payload = snapshot.to_dict(include_hostname=False)
+    return validate_snapshot(payload, "live snapshot")
+
+
 def _run_assess(argv: Sequence[str]) -> int:
-    args = build_assess_parser().parse_args(argv)
-    try:
-        current = load_snapshot(args.current)
-        baseline = load_snapshot(args.baseline) if args.baseline is not None else None
-        assessment = assess_snapshot(current, baseline)
-    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        print(f"rigpilot assess: {exc}", file=sys.stderr)
-        return 2
+    parser = build_assess_parser()
+    args = parser.parse_args(argv)
+    if args.live and args.current is not None:
+        parser.error("a current snapshot path cannot be used with --live")
+    if not args.live and args.current is None:
+        parser.error("a current snapshot path is required unless --live is used")
+    if not args.live and any(value is not None for value in (args.timeout, args.only, args.skip)):
+        parser.error("--timeout, --only, and --skip require --live")
+
+    timeout = 5.0 if args.timeout is None else args.timeout
+    if args.live and (not isfinite(timeout) or timeout <= 0):
+        parser.error("--timeout must be finite and greater than zero")
+
+    if args.live:
+        try:
+            baseline = load_snapshot(args.baseline) if args.baseline is not None else None
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            print(f"rigpilot assess: {exc}", file=sys.stderr)
+            return 2
+        try:
+            current = _collect_assessment_snapshot(timeout=timeout, only=args.only, skip=args.skip)
+            assessment = assess_snapshot(current, baseline)
+            if args.json:
+                print(json.dumps(assessment, indent=2, ensure_ascii=False))
+            else:
+                print(render_assessment_human(assessment))
+        except Exception:  # noqa: BLE001 - Prevent sensitive live failure details from leaking.
+            print("rigpilot assess: live assessment failed", file=sys.stderr)
+            return 1
+        return 0
+    else:
+        try:
+            current = load_snapshot(args.current)
+            baseline = load_snapshot(args.baseline) if args.baseline is not None else None
+            assessment = assess_snapshot(current, baseline)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            print(f"rigpilot assess: {exc}", file=sys.stderr)
+            return 2
+
     if args.json:
         print(json.dumps(assessment, indent=2, ensure_ascii=False))
     else:

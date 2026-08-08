@@ -5,6 +5,11 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Added
+
+- In-memory read-only assessment with `rigpilot assess --live`, including timeout and collector
+  selection controls.
+
 ## [0.3.0] - 2026-08-08
 
 ### Added

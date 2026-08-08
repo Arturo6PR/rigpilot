@@ -91,11 +91,27 @@ Assess a saved snapshot without collecting new telemetry:
 .\.venv\Scripts\python.exe -m rigpilot assess current.json --baseline previous.json --json
 ```
 
+Collect and assess one read-only snapshot in memory without writing it to disk:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot assess --live
+.\.venv\Scripts\python.exe -m rigpilot assess --live --baseline previous.json
+.\.venv\Scripts\python.exe -m rigpilot assess --live --timeout 10 --only storage,bios
+.\.venv\Scripts\python.exe -m rigpilot assess --live --skip nvidia_gpu --json
+```
+
+`--timeout`, `--only`, and `--skip` apply only to live assessment. Live collection happens once,
+is strictly validated in memory, and is passed to the same deterministic assessment rules used
+for saved snapshots. The collected hostname is omitted before assessment, and neither the raw
+snapshot nor sensitive inventory identities are printed. `--baseline` always names a saved
+snapshot; checks excluded by `--only` or `--skip` appear as informational skipped findings.
+
 Assessment reports incomplete probe coverage, low fixed-volume capacity, stable hardware identity
 changes, and missing, future, or five-year-old BIOS release dates. Both files are strictly
 validated before assessment. Findings use `info`, `warning`, and `critical` severity and avoid
 hostnames, volume labels, executable paths, raw probe errors, and hardware identity values.
-Assessment reads saved snapshots only: it does not execute system probes or contact vendors.
+Saved-snapshot assessment does not execute system probes or contact vendors. Live assessment runs
+the same timeout-bounded, read-only probes used by inventory and does not contact vendors.
 
 A fixed volume is `critical` when free space is below both 5% and 10 GiB. It is a `warning` when
 free space is below both 10% and 20 GiB; equality at either boundary does not satisfy that

@@ -28,8 +28,13 @@ jobs:
         run: |
           python -m venv .venv
           .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e ".[dev]"
-      - name: Run repository checks
-        shell: ${{ matrix.shell }}
+      - name: Run repository checks (Windows PowerShell)
+        if: matrix.shell == 'powershell'
+        shell: powershell
+        run: .\scripts\Test-RigPilot.ps1
+      - name: Run repository checks (PowerShell 7)
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
         run: .\scripts\Test-RigPilot.ps1
       - name: Run pytest
         run: .\.venv\Scripts\python.exe -m pytest -q

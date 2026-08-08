@@ -63,7 +63,19 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["checks"]["operating_system"]["status"], "success")
         self.assertEqual(payload["schema_version"], "1.0")
-        collect.assert_called_once_with(timeout=2.0)
+        collect.assert_called_once_with(timeout=2.0, only=None, skip=None)
+
+    @patch("rigpilot.cli.collect_snapshot", return_value=sample_snapshot())
+    def test_only_and_skip_are_forwarded(self, collect) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            main(["--only", "cpu,memory"])
+        collect.assert_called_once_with(timeout=5.0, only={"cpu", "memory"}, skip=None)
+
+    @patch("rigpilot.cli.collect_snapshot")
+    def test_unknown_check_is_rejected_before_collection(self, collect) -> None:
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            main(["--skip", "registry"])
+        collect.assert_not_called()
 
     def test_json_redaction_does_not_mutate_snapshot(self) -> None:
         snapshot = sample_snapshot()

@@ -4,6 +4,8 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from rigpilot.collectors import collect_snapshot
+
 CHECK_NAMES = {
     "operating_system",
     "cpu",
@@ -55,6 +57,12 @@ class SnapshotSchemaTests(unittest.TestCase):
         payload = self.load_fixture("snapshot-success-v1.json")
         del payload["checks"]["cpu"]["data"][0]["NumberOfCores"]
         self.assertFalse(self.validator.is_valid(payload))
+
+    def test_selective_snapshot_remains_schema_compatible(self) -> None:
+        payload = collect_snapshot(only={"python"}).to_dict()
+        self.validator.validate(payload)
+        self.assertEqual(payload["checks"]["python"]["status"], "success")
+        self.assertEqual(payload["checks"]["cpu"]["status"], "unavailable")
 
     def test_failed_and_unavailable_results_reject_non_null_data(self) -> None:
         for status in ("failed", "unavailable"):

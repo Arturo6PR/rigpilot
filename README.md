@@ -62,6 +62,27 @@ Change the per-command timeout when needed:
 .\.venv\Scripts\python.exe -m rigpilot --timeout 10
 ```
 
+Run only selected checks, or skip expensive checks, with comma-separated names:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot --only cpu,memory,nvidia_gpu
+.\.venv\Scripts\python.exe -m rigpilot --skip physical_disks,memory_modules
+```
+
+Excluded checks remain in schema 1.0 as `unavailable` and are marked “Skipped by selection.” Their
+PowerShell or external commands are not executed.
+
+Compare two saved JSON snapshots. Collection timestamps and probe durations are treated as noise:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot diff before.json after.json
+.\.venv\Scripts\python.exe -m rigpilot diff before.json after.json --json
+```
+
+Both files are strictly validated against snapshot schema 1.0 before comparison. Hostname changes
+are reported without showing either hostname. UTF-8, UTF-8 with BOM, and UTF-16 files with a
+little- or big-endian BOM are supported, including output redirected by Windows PowerShell 5.1.
+
 The installed console entry point is also named `rigpilot`.
 
 Human-readable output converts memory and storage sizes to binary units such as GiB and TiB.
@@ -85,7 +106,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-RigPilot.ps1
 
 Tests cover parsers, missing commands, invalid and expired timeouts, operating-system errors,
 nonzero exits, malformed output, multiple CPUs and GPUs, safe command construction, snapshot
-assembly, and both output modes.
+assembly, collector selection, snapshot comparison, and both output modes.
 
 ## Current limitations
 

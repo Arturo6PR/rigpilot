@@ -214,17 +214,19 @@ wheels = [
 name = "rigpilot"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "jsonschema", extra = ["format"] },
+]
 
 [package.optional-dependencies]
 dev = [
-    { name = "jsonschema", extra = ["format"] },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", extras = ["format"], marker = "extra == 'dev'", specifier = ">=4.23" },
+    { name = "jsonschema", extras = ["format"], specifier = ">=4.23" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
 ]

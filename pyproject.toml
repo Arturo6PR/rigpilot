@@ -3,13 +3,13 @@ name = "rigpilot"
 version = "0.1.0"
 description = "Windows-first workstation inventory and diagnostics"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["jsonschema[format]>=4.23"]
 
 [project.scripts]
 rigpilot = "rigpilot.cli:main"
 
 [project.optional-dependencies]
-dev = ["jsonschema[format]>=4.23", "pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6"]
 
 [build-system]
 requires = ["hatchling"]
@@ -21,3 +21,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.hatch.build.targets.wheel.force-include]
+"docs/snapshot.schema.json" = "rigpilot/snapshot.schema.json"

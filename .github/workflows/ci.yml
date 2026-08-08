@@ -10,12 +10,18 @@ permissions:
 
 jobs:
   test:
+    name: Python ${{ matrix.python-version }} / ${{ matrix.shell }}
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        shell: [powershell, pwsh]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install development dependencies
         shell: powershell
@@ -23,7 +29,7 @@ jobs:
           python -m venv .venv
           .\.venv\Scripts\python.exe -m pip install --disable-pip-version-check -e ".[dev]"
       - name: Run repository checks
-        shell: powershell
+        shell: ${{ matrix.shell }}
         run: .\scripts\Test-RigPilot.ps1
       - name: Run pytest
         run: .\.venv\Scripts\python.exe -m pytest -q

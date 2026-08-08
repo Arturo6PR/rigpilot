@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Sequence
 from math import isfinite
+from pathlib import Path
 from typing import Any
 
-from rigpilot.collectors import collect_snapshot
+from rigpilot.collectors import CHECK_NAMES, collect_snapshot
+from rigpilot.diffing import compare_snapshots, load_snapshot, render_diff_human
 from rigpilot.models import CheckResult, CheckStatus, Snapshot
 
 
@@ -162,17 +165,67 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-hostname", action="store_true", help="omit the hostname value from output"
     )
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
+        "--only",
+        type=_parse_check_names,
+        metavar="CHECKS",
+        help="run only comma-separated checks",
+    )
+    selection.add_argument(
+        "--skip",
+        type=_parse_check_names,
+        metavar="CHECKS",
+        help="skip comma-separated checks",
+    )
     parser.add_argument(
         "--timeout", type=float, default=5.0, help="per-command timeout in seconds (default: 5)"
     )
     return parser
 
 
+def _parse_check_names(value: str) -> set[str]:
+    names = {part.strip() for part in value.split(",") if part.strip()}
+    if not names:
+        raise argparse.ArgumentTypeError("at least one check name is required")
+    unknown = names - CHECK_NAMES
+    if unknown:
+        raise argparse.ArgumentTypeError(f"unknown checks: {', '.join(sorted(unknown))}")
+    return names
+
+
+def build_diff_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="rigpilot diff", description="Compare two JSON snapshots."
+    )
+    parser.add_argument("before", type=Path, help="earlier snapshot JSON file")
+    parser.add_argument("after", type=Path, help="later snapshot JSON file")
+    parser.add_argument("--json", action="store_true", help="emit structured JSON output")
+    return parser
+
+
+def _run_diff(argv: Sequence[str]) -> int:
+    args = build_diff_parser().parse_args(argv)
+    try:
+        diff = compare_snapshots(load_snapshot(args.before), load_snapshot(args.after))
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"rigpilot diff: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(diff, indent=2, ensure_ascii=False))
+    else:
+        print(render_diff_human(diff))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["diff"]:
+        return _run_diff(arguments[1:])
+    args = build_parser().parse_args(arguments)
     if not isfinite(args.timeout) or args.timeout <= 0:
         build_parser().error("--timeout must be finite and greater than zero")
-    snapshot = collect_snapshot(timeout=args.timeout)
+    snapshot = collect_snapshot(timeout=args.timeout, only=args.only, skip=args.skip)
     if args.json:
         print(
             json.dumps(

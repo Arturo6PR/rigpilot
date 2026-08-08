@@ -164,6 +164,27 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot.operating_system.status, CheckStatus.UNAVAILABLE)
         self.assertEqual(snapshot.nvidia_gpu.status, CheckStatus.UNAVAILABLE)
 
+    @patch("rigpilot.collectors._powershell_executable")
+    def test_only_python_skips_all_external_probes(self, powershell) -> None:
+        def runner(_command: list[str], _timeout: float) -> CommandResult:
+            self.fail("runner must not be called for excluded checks")
+
+        snapshot = collect_snapshot(runner=runner, only={"python"})
+
+        self.assertEqual(snapshot.python.status, CheckStatus.SUCCESS)
+        self.assertTrue(
+            all(
+                result.status is CheckStatus.UNAVAILABLE
+                for name, result in snapshot.checks().items()
+                if name != "python"
+            )
+        )
+        powershell.assert_not_called()
+
+    def test_unknown_programmatic_selection_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unknown"):
+            collect_snapshot(only={"registry"})
+
     @patch("rigpilot.collectors.shutil.which", side_effect=[None, "C:\\Tools\\pwsh.exe"])
     def test_powershell_discovery_falls_back_to_pwsh(self, which) -> None:
         self.assertEqual(_powershell_executable(), "C:\\Tools\\pwsh.exe")

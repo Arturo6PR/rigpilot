@@ -17,6 +17,22 @@ from rigpilot.models import CheckResult, CheckStatus, Snapshot
 from rigpilot.runner import CommandResult, run_command
 
 Runner = Callable[[list[str], float], CommandResult]
+CHECK_NAMES = frozenset(
+    {
+        "operating_system",
+        "cpu",
+        "memory",
+        "storage",
+        "python",
+        "git",
+        "nvidia_gpu",
+        "system",
+        "bios",
+        "memory_modules",
+        "physical_disks",
+        "uptime",
+    }
+)
 
 
 def parse_json_object(output: str) -> dict[str, Any]:
@@ -173,68 +189,117 @@ def _collect_cim(
     )
 
 
-def collect_snapshot(runner: Runner = run_command, timeout: float = 5.0) -> Snapshot:
+def collect_snapshot(
+    runner: Runner = run_command,
+    timeout: float = 5.0,
+    only: set[str] | None = None,
+    skip: set[str] | None = None,
+) -> Snapshot:
     """Collect a read-only snapshot, preserving the outcome of every check."""
 
-    operating_system = _collect_cim(
-        "Win32_OperatingSystem",
-        ["Caption", "Version", "BuildNumber", "OSArchitecture"],
-        parse_json_object,
-        runner,
-        timeout,
+    skip = skip or set()
+    requested = CHECK_NAMES if only is None else frozenset(only)
+    unknown = (requested | skip) - CHECK_NAMES
+    if unknown:
+        raise ValueError(f"Unknown checks: {', '.join(sorted(unknown))}")
+    enabled = requested - skip
+
+    def omitted(name: str) -> CheckResult:
+        return CheckResult.unavailable(f"Skipped by selection: {name}")
+
+    operating_system = (
+        _collect_cim(
+            "Win32_OperatingSystem",
+            ["Caption", "Version", "BuildNumber", "OSArchitecture"],
+            parse_json_object,
+            runner,
+            timeout,
+        )
+        if "operating_system" in enabled
+        else omitted("operating_system")
     )
-    cpu = _collect_cim(
-        "Win32_Processor",
-        ["Name", "NumberOfCores", "NumberOfLogicalProcessors"],
-        parse_json_objects,
-        runner,
-        timeout,
+    cpu = (
+        _collect_cim(
+            "Win32_Processor",
+            ["Name", "NumberOfCores", "NumberOfLogicalProcessors"],
+            parse_json_objects,
+            runner,
+            timeout,
+        )
+        if "cpu" in enabled
+        else omitted("cpu")
     )
-    memory = _collect_cim(
-        "Win32_OperatingSystem",
-        ["TotalVisibleMemorySize", "FreePhysicalMemory"],
-        parse_json_object,
-        runner,
-        timeout,
+    memory = (
+        _collect_cim(
+            "Win32_OperatingSystem",
+            ["TotalVisibleMemorySize", "FreePhysicalMemory"],
+            parse_json_object,
+            runner,
+            timeout,
+        )
+        if "memory" in enabled
+        else omitted("memory")
     )
-    storage = _collect_cim(
-        "Win32_LogicalDisk",
-        ["DeviceID", "VolumeName", "Size", "FreeSpace"],
-        parse_storage,
-        runner,
-        timeout,
-        filter_expression="DriveType=3",
+    storage = (
+        _collect_cim(
+            "Win32_LogicalDisk",
+            ["DeviceID", "VolumeName", "Size", "FreeSpace"],
+            parse_storage,
+            runner,
+            timeout,
+            filter_expression="DriveType=3",
+        )
+        if "storage" in enabled
+        else omitted("storage")
     )
-    system = _collect_cim(
-        "Win32_ComputerSystem",
-        ["Manufacturer", "Model"],
-        parse_json_object,
-        runner,
-        timeout,
+    system = (
+        _collect_cim(
+            "Win32_ComputerSystem",
+            ["Manufacturer", "Model"],
+            parse_json_object,
+            runner,
+            timeout,
+        )
+        if "system" in enabled
+        else omitted("system")
     )
-    bios = _collect_cim(
-        "Win32_BIOS",
-        ["Manufacturer", "SMBIOSBIOSVersion", "ReleaseDate"],
-        parse_bios,
-        runner,
-        timeout,
+    bios = (
+        _collect_cim(
+            "Win32_BIOS",
+            ["Manufacturer", "SMBIOSBIOSVersion", "ReleaseDate"],
+            parse_bios,
+            runner,
+            timeout,
+        )
+        if "bios" in enabled
+        else omitted("bios")
     )
-    memory_modules = _collect_cim(
-        "Win32_PhysicalMemory",
-        ["Manufacturer", "PartNumber", "Capacity", "Speed", "ConfiguredClockSpeed"],
-        parse_json_objects,
-        runner,
-        timeout,
+    memory_modules = (
+        _collect_cim(
+            "Win32_PhysicalMemory",
+            ["Manufacturer", "PartNumber", "Capacity", "Speed", "ConfiguredClockSpeed"],
+            parse_json_objects,
+            runner,
+            timeout,
+        )
+        if "memory_modules" in enabled
+        else omitted("memory_modules")
     )
-    physical_disks = _collect_cim(
-        "Win32_DiskDrive",
-        ["Model", "InterfaceType", "MediaType", "Size", "Status"],
-        parse_json_objects,
-        runner,
-        timeout,
+    physical_disks = (
+        _collect_cim(
+            "Win32_DiskDrive",
+            ["Model", "InterfaceType", "MediaType", "Size", "Status"],
+            parse_json_objects,
+            runner,
+            timeout,
+        )
+        if "physical_disks" in enabled
+        else omitted("physical_disks")
     )
-    powershell = _powershell_executable()
-    if powershell is None:
+    powershell = _powershell_executable() if "uptime" in enabled else None
+    if "uptime" not in enabled:
+        uptime = omitted("uptime")
+    elif powershell is None:
         uptime = CheckResult.unavailable("PowerShell is not available")
     else:
         uptime_expression = (
@@ -248,23 +313,35 @@ def collect_snapshot(runner: Runner = run_command, timeout: float = 5.0) -> Snap
             runner,
             timeout,
         )
-    python_result = CheckResult.success(
-        {
-            "version": platform.python_version(),
-            "implementation": platform.python_implementation(),
-            "executable": sys.executable,
-        }
+    python_result = (
+        CheckResult.success(
+            {
+                "version": platform.python_version(),
+                "implementation": platform.python_implementation(),
+                "executable": sys.executable,
+            }
+        )
+        if "python" in enabled
+        else omitted("python")
     )
-    git_result = _collect_command(["git", "--version"], parse_git_version, runner, timeout)
-    nvidia_result = _collect_command(
-        [
-            "nvidia-smi",
-            "--query-gpu=name,driver_version,memory.total,utilization.gpu,temperature.gpu",
-            "--format=csv,noheader,nounits",
-        ],
-        parse_nvidia_csv,
-        runner,
-        timeout,
+    git_result = (
+        _collect_command(["git", "--version"], parse_git_version, runner, timeout)
+        if "git" in enabled
+        else omitted("git")
+    )
+    nvidia_result = (
+        _collect_command(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,driver_version,memory.total,utilization.gpu,temperature.gpu",
+                "--format=csv,noheader,nounits",
+            ],
+            parse_nvidia_csv,
+            runner,
+            timeout,
+        )
+        if "nvidia_gpu" in enabled
+        else omitted("nvidia_gpu")
     )
     return Snapshot(
         operating_system=operating_system,

@@ -120,6 +120,37 @@ catalog: it does not execute commands, delete files, download software, select a
 change workstation settings. It explains the limits of each finding and recommends only review,
 verification, planning, or consultation.
 
+Apply an opt-in deterministic policy view to select displayed findings and optionally make the
+result usable as a CI decision:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --policy
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --policy --policy-min-severity warning
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --policy --policy-groups storage,bios
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --policy --policy-checks storage,bios
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --policy --policy-fail-on critical --json
+.\.venv\Scripts\python.exe -m rigpilot assess --live --guidance --policy --policy-fail-on warning
+```
+
+Policy groups are `probes`, `storage`, `hardware`, and `bios`. Values within a group or check
+selector are ORed; severity, group, and check selectors are combined with AND. A minimum severity
+includes that severity and more severe findings. Omitted selectors mean all. User order and
+duplicates are normalized, while displayed findings retain canonical assessment order.
+
+All `--policy-*` options require `--policy`. `--only` and `--skip` still select which live probes
+execute; `--policy-checks` only selects findings after assessment and is never sent to collectors.
+Impossible group/check intersections are rejected before input is loaded or live collection can
+start. A fail-on threshold cannot be less severe than the display minimum, so a hidden finding
+cannot trigger the decision.
+
+Policy JSON uses schema 1.0 and embeds the complete, unchanged assessment or guidance report. Its
+view refers to findings by canonical index instead of copying them. Human output always states
+the canonical, displayed, and hidden finding counts. Findings alone still return exit code `0`;
+`--policy-fail-on` returns `3` only after output is emitted when a displayed finding reaches the
+threshold. Invalid arguments or saved inputs return `2`, and unexpected policy failures return
+`1` with a concise error. The policy layer is pure and read-only: it does not collect data,
+execute commands, contact vendors, or change the source report or workstation.
+
 Assessment reports incomplete probe coverage, low fixed-volume capacity, stable hardware identity
 changes, and missing, future, or five-year-old BIOS release dates. Both files are strictly
 validated before assessment. Findings use `info`, `warning`, and `critical` severity and avoid
@@ -143,7 +174,8 @@ report more than one physical processor.
 JSON snapshots use schema version `1.0` and include the UTC collection timestamp, hostname, and
 per-check duration. The schema is published at `docs/snapshot.schema.json`; assessment output has
 its own version `1.0` schema at `docs/assessment.schema.json`, and opt-in guidance reports use
-`docs/guidance.schema.json`. Hostnames, hardware
+`docs/guidance.schema.json`. Opt-in policy reports use `docs/policy.schema.json`. Hostnames,
+hardware
 serial-like identifiers, filesystem labels, and executable paths can be sensitive; inspect JSON
 before sharing it. RigPilot keeps snapshots local unless the user explicitly redirects or uploads
 the output.
@@ -159,7 +191,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-RigPilot.ps1
 Tests cover parsers, missing commands, invalid and expired timeouts, operating-system errors,
 nonzero exits, malformed output, multiple CPUs and GPUs, safe command construction, snapshot
 assembly, collector selection, snapshot comparison, deterministic assessment rules, privacy,
-schema validation, and output modes.
+schema validation, deterministic guidance and policy views, policy decisions, and output modes.
 
 ## Current limitations
 

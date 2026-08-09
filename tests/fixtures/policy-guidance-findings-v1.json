@@ -1,0 +1,110 @@
+{
+  "policy_schema_version": "1.0",
+  "report_kind": "guidance",
+  "report": {
+    "guidance_schema_version": "1.0",
+    "assessment": {
+      "assessment_schema_version": "1.0",
+      "snapshot_schema_version": "1.0",
+      "subject_collected_at_utc": "2026-08-08T17:00:00+00:00",
+      "baseline_collected_at_utc": null,
+      "summary": {
+        "highest_severity": "critical",
+        "counts": { "info": 1, "warning": 2, "critical": 1 }
+      },
+      "findings": [
+        {
+          "rule_id": "storage.critically_low_capacity",
+          "severity": "critical",
+          "check": "storage",
+          "subject": "C:",
+          "message": "Fixed volume has critically low free capacity.",
+          "evidence": { "free_bytes": 4294967296, "total_bytes": 1099511627776, "free_percent": 0.4 }
+        },
+        {
+          "rule_id": "bios.release_date_stale",
+          "severity": "warning",
+          "check": "bios",
+          "subject": null,
+          "message": "BIOS release date is at least five years old; review manufacturer guidance.",
+          "evidence": { "release_date": "2020-01-01", "age_years": 6 }
+        },
+        {
+          "rule_id": "probe.failed",
+          "severity": "warning",
+          "check": "cpu",
+          "subject": null,
+          "message": "Inventory probe failed; assessment coverage is incomplete.",
+          "evidence": { "status": "failed" }
+        },
+        {
+          "rule_id": "probe.optional_unavailable",
+          "severity": "info",
+          "check": "nvidia_gpu",
+          "subject": null,
+          "message": "Optional NVIDIA inventory is unavailable.",
+          "evidence": { "status": "unavailable" }
+        }
+      ]
+    },
+    "guidance": [
+      {
+        "finding_index": 0,
+        "rule_id": "storage.critically_low_capacity",
+        "explanation": "Available capacity is below both of RigPilot's critical thresholds.",
+        "next_steps": [
+          { "action_id": "protect_important_data", "kind": "verify", "text": "Confirm that important data is protected before making storage changes." },
+          { "action_id": "avoid_large_new_writes", "kind": "plan", "text": "Avoid unnecessary large new writes while capacity remains critically low." },
+          { "action_id": "plan_additional_capacity", "kind": "plan", "text": "Plan additional capacity promptly." }
+        ]
+      },
+      {
+        "finding_index": 1,
+        "rule_id": "bios.release_date_stale",
+        "explanation": "The reported BIOS release date is at least five complete calendar years old; age alone does not establish a vulnerability.",
+        "next_steps": [
+          { "action_id": "review_official_bios_guidance", "kind": "consult", "text": "Review the system manufacturer's official guidance for the exact system." },
+          { "action_id": "avoid_unverified_firmware", "kind": "verify", "text": "Do not install firmware solely because of this finding, and do not select a BIOS version without verified manufacturer guidance." }
+        ]
+      },
+      {
+        "finding_index": 2,
+        "rule_id": "probe.failed",
+        "explanation": "This inventory check did not complete successfully, so related assessment coverage is incomplete.",
+        "next_steps": [
+          { "action_id": "repeat_assessment_once", "kind": "verify", "text": "Repeat the assessment once to determine whether the failure persists." },
+          { "action_id": "consult_persistent_probe_failure", "kind": "consult", "text": "If it persists, note which check was affected and consult qualified support; do not infer a hardware fault from this finding alone." }
+        ]
+      },
+      {
+        "finding_index": 3,
+        "rule_id": "probe.optional_unavailable",
+        "explanation": "The optional NVIDIA inventory check was unavailable; this does not indicate a GPU problem.",
+        "next_steps": [
+          { "action_id": "confirm_nvidia_coverage_needed", "kind": "review", "text": "No action is required when NVIDIA hardware is not expected." },
+          { "action_id": "verify_nvidia_local_support", "kind": "verify", "text": "If NVIDIA coverage is expected, verify that supported NVIDIA hardware and locally installed management tooling are available." }
+        ]
+      }
+    ]
+  },
+  "policy": {
+    "minimum_severity": "warning",
+    "rule_groups": ["storage", "bios"],
+    "checks": null,
+    "fail_on": "critical"
+  },
+  "view": {
+    "finding_indices": [0, 1],
+    "summary": {
+      "highest_severity": "critical",
+      "counts": { "info": 0, "warning": 1, "critical": 1 },
+      "displayed_count": 2,
+      "hidden_count": 2
+    }
+  },
+  "decision": {
+    "triggered": true,
+    "matching_finding_indices": [0],
+    "exit_code": 3
+  }
+}

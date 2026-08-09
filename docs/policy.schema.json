@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rigpilot:schema:policy:1.0",
+  "title": "RigPilot policy report",
+  "type": "object",
+  "required": ["policy_schema_version", "report_kind", "report", "policy", "view", "decision"],
+  "properties": {
+    "policy_schema_version": { "const": "1.0" },
+    "report_kind": { "enum": ["assessment", "guidance"] },
+    "report": {
+      "oneOf": [
+        { "$ref": "urn:rigpilot:schema:assessment:1.0" },
+        { "$ref": "urn:rigpilot:schema:guidance:1.0" }
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "required": ["minimum_severity", "rule_groups", "checks", "fail_on"],
+      "properties": {
+        "minimum_severity": { "enum": ["critical", "warning", "info", null] },
+        "rule_groups": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "enum": ["probes", "storage", "hardware", "bios"] }
+            }
+          ]
+        },
+        "checks": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": ["operating_system", "cpu", "memory", "storage", "python", "git", "nvidia_gpu", "system", "bios", "memory_modules", "physical_disks", "uptime"]
+              }
+            }
+          ]
+        },
+        "fail_on": { "enum": ["critical", "warning", "info", null] }
+      },
+      "additionalProperties": false
+    },
+    "view": {
+      "type": "object",
+      "required": ["finding_indices", "summary"],
+      "properties": {
+        "finding_indices": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "uniqueItems": true
+        },
+        "summary": {
+          "type": "object",
+          "required": ["highest_severity", "counts", "displayed_count", "hidden_count"],
+          "properties": {
+            "highest_severity": { "enum": ["critical", "warning", "info", null] },
+            "counts": {
+              "type": "object",
+              "required": ["info", "warning", "critical"],
+              "properties": {
+                "info": { "type": "integer", "minimum": 0 },
+                "warning": { "type": "integer", "minimum": 0 },
+                "critical": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            },
+            "displayed_count": { "type": "integer", "minimum": 0 },
+            "hidden_count": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "required": ["triggered", "matching_finding_indices", "exit_code"],
+      "properties": {
+        "triggered": { "type": "boolean" },
+        "matching_finding_indices": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "uniqueItems": true
+        },
+        "exit_code": { "enum": [0, 3] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "report_kind": { "const": "assessment" } } },
+      "then": { "properties": { "report": { "$ref": "urn:rigpilot:schema:assessment:1.0" } } }
+    },
+    {
+      "if": { "properties": { "report_kind": { "const": "guidance" } } },
+      "then": { "properties": { "report": { "$ref": "urn:rigpilot:schema:guidance:1.0" } } }
+    }
+  ],
+  "additionalProperties": false
+}

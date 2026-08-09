@@ -5,6 +5,12 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in deterministic policy views and fail-on decisions for assessment findings, with strict
+  schema validation, canonical source preservation, and separate severity, group, and check
+  selectors.
+
 ## [0.5.0] - 2026-08-09
 
 ### Added

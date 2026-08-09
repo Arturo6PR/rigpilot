@@ -15,6 +15,13 @@ from rigpilot.collectors import CHECK_NAMES, collect_snapshot
 from rigpilot.diffing import compare_snapshots, load_snapshot, render_diff_human, validate_snapshot
 from rigpilot.guidance import build_guidance, render_guidance_human
 from rigpilot.models import CheckResult, CheckStatus, Snapshot
+from rigpilot.policy import (
+    POLICY_CHECKS,
+    RULE_GROUPS_ORDER,
+    Policy,
+    build_policy_report,
+    render_policy_human,
+)
 
 
 def _format_binary_size(byte_count: float) -> str:
@@ -196,6 +203,24 @@ def _parse_check_names(value: str) -> set[str]:
     return names
 
 
+def _parse_policy_selector(value: str, *, allowed: tuple[str, ...], label: str) -> tuple[str, ...]:
+    values = tuple(part.strip() for part in value.split(",") if part.strip())
+    if not values:
+        raise argparse.ArgumentTypeError(f"at least one {label} is required")
+    unknown = set(values) - set(allowed)
+    if unknown:
+        raise argparse.ArgumentTypeError(f"unknown {label}: {', '.join(sorted(unknown))}")
+    return values
+
+
+def _parse_policy_groups(value: str) -> tuple[str, ...]:
+    return _parse_policy_selector(value, allowed=RULE_GROUPS_ORDER, label="policy group")
+
+
+def _parse_policy_checks(value: str) -> tuple[str, ...]:
+    return _parse_policy_selector(value, allowed=POLICY_CHECKS, label="policy check")
+
+
 def build_diff_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rigpilot diff", description="Compare two JSON snapshots."
@@ -233,6 +258,31 @@ def build_assess_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--guidance", action="store_true", help="include deterministic safe next-step guidance"
     )
+    parser.add_argument(
+        "--policy", action="store_true", help="apply a deterministic finding view and decision"
+    )
+    parser.add_argument(
+        "--policy-min-severity",
+        choices=("critical", "warning", "info"),
+        help="display findings at or above this severity",
+    )
+    parser.add_argument(
+        "--policy-groups",
+        type=_parse_policy_groups,
+        metavar="GROUPS",
+        help="display comma-separated probes, storage, hardware, or bios groups",
+    )
+    parser.add_argument(
+        "--policy-checks",
+        type=_parse_policy_checks,
+        metavar="CHECKS",
+        help="display findings from comma-separated checks",
+    )
+    parser.add_argument(
+        "--policy-fail-on",
+        choices=("critical", "warning", "info"),
+        help="return 3 when a displayed finding reaches this severity",
+    )
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument(
         "--only",
@@ -262,6 +312,24 @@ def _collect_assessment_snapshot(
     return validate_snapshot(payload, "live snapshot")
 
 
+def _policy_from_args(args: argparse.Namespace) -> Policy:
+    return Policy(
+        minimum_severity=args.policy_min_severity,
+        rule_groups=args.policy_groups,
+        checks=args.policy_checks,
+        fail_on=args.policy_fail_on,
+    )
+
+
+def _emit_policy_report(source: dict[str, Any], policy: Policy, *, as_json: bool) -> int:
+    report = build_policy_report(source, policy)
+    if as_json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(render_policy_human(report))
+    return report["decision"]["exit_code"]
+
+
 def _run_assess(argv: Sequence[str]) -> int:
     parser = build_assess_parser()
     args = parser.parse_args(argv)
@@ -271,6 +339,18 @@ def _run_assess(argv: Sequence[str]) -> int:
         parser.error("a current snapshot path is required unless --live is used")
     if not args.live and any(value is not None for value in (args.timeout, args.only, args.skip)):
         parser.error("--timeout, --only, and --skip require --live")
+    policy_options = (
+        args.policy_min_severity,
+        args.policy_groups,
+        args.policy_checks,
+        args.policy_fail_on,
+    )
+    if not args.policy and any(value is not None for value in policy_options):
+        parser.error("--policy-* options require --policy")
+    try:
+        policy = _policy_from_args(args) if args.policy else None
+    except ValueError as exc:
+        parser.error(str(exc))
 
     timeout = 5.0 if args.timeout is None else args.timeout
     if args.live and (not isfinite(timeout) or timeout <= 0):
@@ -285,7 +365,10 @@ def _run_assess(argv: Sequence[str]) -> int:
         try:
             current = _collect_assessment_snapshot(timeout=timeout, only=args.only, skip=args.skip)
             assessment = assess_snapshot(current, baseline)
-            if args.guidance:
+            if policy is not None:
+                source = build_guidance(assessment) if args.guidance else assessment
+                return _emit_policy_report(source, policy, as_json=args.json)
+            elif args.guidance:
                 guidance = build_guidance(assessment)
                 if args.json:
                     print(json.dumps(guidance, indent=2, ensure_ascii=False))
@@ -310,7 +393,14 @@ def _run_assess(argv: Sequence[str]) -> int:
             print(f"rigpilot assess: {exc}", file=sys.stderr)
             return 2
 
-    if args.guidance:
+    if policy is not None:
+        try:
+            source = build_guidance(assessment) if args.guidance else assessment
+            return _emit_policy_report(source, policy, as_json=args.json)
+        except Exception:  # noqa: BLE001 - Policy failures must not expose private details.
+            print("rigpilot assess: policy failed", file=sys.stderr)
+            return 1
+    elif args.guidance:
         try:
             guidance = build_guidance(assessment)
             if args.json:

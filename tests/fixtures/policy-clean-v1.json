@@ -1,0 +1,35 @@
+{
+  "policy_schema_version": "1.0",
+  "report_kind": "assessment",
+  "report": {
+    "assessment_schema_version": "1.0",
+    "snapshot_schema_version": "1.0",
+    "subject_collected_at_utc": "2026-08-08T17:00:00+00:00",
+    "baseline_collected_at_utc": null,
+    "summary": {
+      "highest_severity": null,
+      "counts": { "info": 0, "warning": 0, "critical": 0 }
+    },
+    "findings": []
+  },
+  "policy": {
+    "minimum_severity": null,
+    "rule_groups": null,
+    "checks": null,
+    "fail_on": null
+  },
+  "view": {
+    "finding_indices": [],
+    "summary": {
+      "highest_severity": null,
+      "counts": { "info": 0, "warning": 0, "critical": 0 },
+      "displayed_count": 0,
+      "hidden_count": 0
+    }
+  },
+  "decision": {
+    "triggered": false,
+    "matching_finding_indices": [],
+    "exit_code": 0
+  }
+}

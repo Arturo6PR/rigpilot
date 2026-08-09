@@ -229,26 +229,18 @@ def render_policy_human(payload: dict[str, Any]) -> str:
         if payload["report_kind"] == "guidance"
         else {}
     )
-    for severity in SEVERITIES:
-        indices = [
-            index
-            for index in payload["view"]["finding_indices"]
-            if assessment["findings"][index]["severity"] == severity
-        ]
-        if not indices:
-            continue
-        lines.append(f"{severity.title()} ({len(indices)})")
-        for index in indices:
-            finding = assessment["findings"][index]
-            subject = f" [{finding['subject']}]" if finding["subject"] else ""
-            lines.append(
-                f"  {finding['rule_id']} ({finding['check']}){subject}: {finding['message']}"
-            )
-            guidance = guidance_by_index.get(index)
-            if guidance is not None:
-                lines.append(f"    What it means: {guidance['explanation']}")
-                lines.append("    Safe next steps:")
-                lines.extend(f"      - {action['text']}" for action in guidance["next_steps"])
+    for index in payload["view"]["finding_indices"]:
+        finding = assessment["findings"][index]
+        subject = f" [{finding['subject']}]" if finding["subject"] else ""
+        lines.append(
+            f"{finding['severity'].title()}: "
+            f"{finding['rule_id']} ({finding['check']}){subject}: {finding['message']}"
+        )
+        guidance = guidance_by_index.get(index)
+        if guidance is not None:
+            lines.append(f"  What it means: {guidance['explanation']}")
+            lines.append("  Safe next steps:")
+            lines.extend(f"    - {action['text']}" for action in guidance["next_steps"])
     fail_on = policy["fail_on"]
     if payload["decision"]["triggered"]:
         lines.append(f"Decision: triggered at {fail_on} severity")

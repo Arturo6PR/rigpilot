@@ -351,6 +351,12 @@ def _run_assess(argv: Sequence[str]) -> int:
         policy = _policy_from_args(args) if args.policy else None
     except ValueError as exc:
         parser.error(str(exc))
+    except Exception:  # noqa: BLE001 - Policy failures must not expose private details.
+        if args.live:
+            print("rigpilot assess: live assessment failed", file=sys.stderr)
+        else:
+            print("rigpilot assess: policy failed", file=sys.stderr)
+        return 1
 
     timeout = 5.0 if args.timeout is None else args.timeout
     if args.live and (not isfinite(timeout) or timeout <= 0):

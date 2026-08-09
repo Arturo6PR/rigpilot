@@ -5,6 +5,8 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-09
+
 ### Added
 
 - Opt-in deterministic policy views and fail-on decisions for assessment findings, with strict
@@ -57,7 +59,8 @@ Versioning, and dates use ISO 8601.
 - `--redact` and `--no-hostname` privacy controls.
 - Golden success and failure snapshot fixtures for compatibility testing.
 
-[Unreleased]: https://github.com/Arturo6PR/rigpilot/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Arturo6PR/rigpilot/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.2.0...v0.3.0

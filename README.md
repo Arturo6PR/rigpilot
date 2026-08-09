@@ -106,6 +106,20 @@ for saved snapshots. The collected hostname is omitted before assessment, and ne
 snapshot nor sensitive inventory identities are printed. `--baseline` always names a saved
 snapshot; checks excluded by `--only` or `--skip` appear as informational skipped findings.
 
+Add deterministic explanations and safe next-step guidance with `--guidance`:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --guidance
+.\.venv\Scripts\python.exe -m rigpilot assess --live --guidance --json
+```
+
+Without `--guidance`, assessment output remains schema 1.0 and keeps its existing shape. With
+`--guidance --json`, RigPilot emits a guidance-schema-1.0 report containing the unchanged
+assessment and a separate guidance entry for each finding. Guidance uses a static, versioned
+catalog: it does not execute commands, delete files, download software, select a BIOS version, or
+change workstation settings. It explains the limits of each finding and recommends only review,
+verification, planning, or consultation.
+
 Assessment reports incomplete probe coverage, low fixed-volume capacity, stable hardware identity
 changes, and missing, future, or five-year-old BIOS release dates. Both files are strictly
 validated before assessment. Findings use `info`, `warning`, and `critical` severity and avoid
@@ -128,7 +142,8 @@ report more than one physical processor.
 
 JSON snapshots use schema version `1.0` and include the UTC collection timestamp, hostname, and
 per-check duration. The schema is published at `docs/snapshot.schema.json`; assessment output has
-its own version `1.0` schema at `docs/assessment.schema.json`. Hostnames, hardware
+its own version `1.0` schema at `docs/assessment.schema.json`, and opt-in guidance reports use
+`docs/guidance.schema.json`. Hostnames, hardware
 serial-like identifiers, filesystem labels, and executable paths can be sensitive; inspect JSON
 before sharing it. RigPilot keeps snapshots local unless the user explicitly redirects or uploads
 the output.

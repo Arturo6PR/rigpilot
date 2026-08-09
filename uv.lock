@@ -216,6 +216,7 @@ version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema", extra = ["format"] },
+    { name = "referencing" },
 ]
 
 [package.optional-dependencies]
@@ -228,6 +229,7 @@ dev = [
 requires-dist = [
     { name = "jsonschema", extras = ["format"], specifier = ">=4.23" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "referencing", specifier = ">=0.28.4" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
 ]
 provides-extras = ["dev"]

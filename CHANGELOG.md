@@ -5,6 +5,11 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in deterministic guidance for assessment findings, with a separately versioned strict
+  schema and static privacy-safe next-step catalog.
+
 ## [0.4.0] - 2026-08-09
 
 ### Added

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rigpilot:schema:guidance:1.0",
+  "title": "RigPilot assessment guidance report",
+  "type": "object",
+  "required": ["guidance_schema_version", "assessment", "guidance"],
+  "properties": {
+    "guidance_schema_version": { "const": "1.0" },
+    "assessment": { "$ref": "urn:rigpilot:schema:assessment:1.0" },
+    "guidance": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/guidanceEntry" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "guidanceEntry": {
+      "type": "object",
+      "required": ["finding_index", "rule_id", "explanation", "next_steps"],
+      "properties": {
+        "finding_index": { "type": "integer", "minimum": 0 },
+        "rule_id": { "type": "string" },
+        "explanation": { "type": "string", "minLength": 1 },
+        "next_steps": { "type": "array", "minItems": 1 }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        { "$ref": "#/$defs/probeSkipped" },
+        { "$ref": "#/$defs/probeOptionalUnavailable" },
+        { "$ref": "#/$defs/probeUnavailable" },
+        { "$ref": "#/$defs/probeFailed" },
+        { "$ref": "#/$defs/storageLow" },
+        { "$ref": "#/$defs/storageCritical" },
+        { "$ref": "#/$defs/hardwareChanged" },
+        { "$ref": "#/$defs/biosMissing" },
+        { "$ref": "#/$defs/biosFuture" },
+        { "$ref": "#/$defs/biosStale" }
+      ]
+    },
+    "probeSkipped": {
+      "properties": {
+        "rule_id": { "const": "probe.skipped" },
+        "explanation": { "const": "This inventory check was intentionally excluded, so its results were not assessed." },
+        "next_steps": { "const": [{ "action_id": "include_check_if_needed", "kind": "review", "text": "No action is required; include this check in a future assessment if its coverage is needed." }] }
+      }
+    },
+    "probeOptionalUnavailable": {
+      "properties": {
+        "rule_id": { "const": "probe.optional_unavailable" },
+        "explanation": { "const": "The optional NVIDIA inventory check was unavailable; this does not indicate a GPU problem." },
+        "next_steps": { "const": [{ "action_id": "confirm_nvidia_coverage_needed", "kind": "review", "text": "No action is required when NVIDIA hardware is not expected." }, { "action_id": "verify_nvidia_local_support", "kind": "verify", "text": "If NVIDIA coverage is expected, verify that supported NVIDIA hardware and locally installed management tooling are available." }] }
+      }
+    },
+    "probeUnavailable": {
+      "properties": {
+        "rule_id": { "const": "probe.unavailable" },
+        "explanation": { "const": "This inventory check could not run, so assessment coverage for it is incomplete." },
+        "next_steps": { "const": [{ "action_id": "verify_local_inventory_support", "kind": "verify", "text": "Verify that the local software required for this inventory check is installed and available." }, { "action_id": "repeat_after_local_review", "kind": "review", "text": "Repeat the assessment after reviewing the local software and configured timeout." }] }
+      }
+    },
+    "probeFailed": {
+      "properties": {
+        "rule_id": { "const": "probe.failed" },
+        "explanation": { "const": "This inventory check did not complete successfully, so related assessment coverage is incomplete." },
+        "next_steps": { "const": [{ "action_id": "repeat_assessment_once", "kind": "verify", "text": "Repeat the assessment once to determine whether the failure persists." }, { "action_id": "consult_persistent_probe_failure", "kind": "consult", "text": "If it persists, note which check was affected and consult qualified support; do not infer a hardware fault from this finding alone." }] }
+      }
+    },
+    "storageLow": {
+      "properties": {
+        "rule_id": { "const": "storage.low_capacity" },
+        "explanation": { "const": "Available capacity is below RigPilot's warning thresholds." },
+        "next_steps": { "const": [{ "action_id": "review_storage_usage", "kind": "review", "text": "Review storage usage and identify data that could be moved to approved storage." }, { "action_id": "plan_storage_capacity", "kind": "plan", "text": "Plan additional capacity if expected workloads require more space." }] }
+      }
+    },
+    "storageCritical": {
+      "properties": {
+        "rule_id": { "const": "storage.critically_low_capacity" },
+        "explanation": { "const": "Available capacity is below both of RigPilot's critical thresholds." },
+        "next_steps": { "const": [{ "action_id": "protect_important_data", "kind": "verify", "text": "Confirm that important data is protected before making storage changes." }, { "action_id": "avoid_large_new_writes", "kind": "plan", "text": "Avoid unnecessary large new writes while capacity remains critically low." }, { "action_id": "plan_additional_capacity", "kind": "plan", "text": "Plan additional capacity promptly." }] }
+      }
+    },
+    "hardwareChanged": {
+      "properties": {
+        "rule_id": { "enum": ["hardware.system_changed", "hardware.cpu_changed", "hardware.memory_changed", "hardware.physical_disks_changed", "hardware.nvidia_gpu_changed"] },
+        "explanation": { "const": "Stable inventory fields differ from the baseline; this does not establish failure or tampering." },
+        "next_steps": { "const": [{ "action_id": "compare_change_records", "kind": "verify", "text": "Compare the finding with intentional upgrades, maintenance, and configuration records." }, { "action_id": "investigate_unexpected_change", "kind": "consult", "text": "If the change is unexpected, inspect the workstation or consult qualified support before taking corrective action." }] }
+      }
+    },
+    "biosMissing": {
+      "properties": {
+        "rule_id": { "const": "bios.release_date_missing" },
+        "explanation": { "const": "RigPilot cannot evaluate BIOS age because no release date was reported." },
+        "next_steps": { "const": [{ "action_id": "review_official_bios_information", "kind": "consult", "text": "Consult the system manufacturer's official support information if BIOS currency matters." }] }
+      }
+    },
+    "biosFuture": {
+      "properties": {
+        "rule_id": { "const": "bios.release_date_future" },
+        "explanation": { "const": "The reported BIOS date is later than the snapshot collection date; this may reflect clock or firmware metadata." },
+        "next_steps": { "const": [{ "action_id": "verify_system_time", "kind": "verify", "text": "Verify that the workstation date and time are correct." }, { "action_id": "review_official_bios_information", "kind": "consult", "text": "Consult the system manufacturer's official support information if the date remains unexpected." }] }
+      }
+    },
+    "biosStale": {
+      "properties": {
+        "rule_id": { "const": "bios.release_date_stale" },
+        "explanation": { "const": "The reported BIOS release date is at least five complete calendar years old; age alone does not establish a vulnerability." },
+        "next_steps": { "const": [{ "action_id": "review_official_bios_guidance", "kind": "consult", "text": "Review the system manufacturer's official guidance for the exact system." }, { "action_id": "avoid_unverified_firmware", "kind": "verify", "text": "Do not install firmware solely because of this finding, and do not select a BIOS version without verified manufacturer guidance." }] }
+      }
+    }
+  }
+}

@@ -3,7 +3,7 @@ name = "rigpilot"
 version = "0.4.0"
 description = "Windows-first workstation inventory and diagnostics"
 requires-python = ">=3.11"
-dependencies = ["jsonschema[format]>=4.23"]
+dependencies = ["jsonschema[format]>=4.23", "referencing>=0.28.4"]
 
 [project.scripts]
 rigpilot = "rigpilot.cli:main"
@@ -25,3 +25,4 @@ target-version = "py311"
 [tool.hatch.build.targets.wheel.force-include]
 "docs/snapshot.schema.json" = "rigpilot/snapshot.schema.json"
 "docs/assessment.schema.json" = "rigpilot/assessment.schema.json"
+"docs/guidance.schema.json" = "rigpilot/guidance.schema.json"

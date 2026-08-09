@@ -13,6 +13,7 @@ from typing import Any
 from rigpilot.assessment import assess_snapshot, render_assessment_human
 from rigpilot.collectors import CHECK_NAMES, collect_snapshot
 from rigpilot.diffing import compare_snapshots, load_snapshot, render_diff_human, validate_snapshot
+from rigpilot.guidance import build_guidance, render_guidance_human
 from rigpilot.models import CheckResult, CheckStatus, Snapshot
 
 
@@ -229,6 +230,9 @@ def build_assess_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--baseline", type=Path, help="earlier snapshot for hardware comparison")
     parser.add_argument("--json", action="store_true", help="emit structured JSON output")
+    parser.add_argument(
+        "--guidance", action="store_true", help="include deterministic safe next-step guidance"
+    )
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument(
         "--only",
@@ -281,7 +285,15 @@ def _run_assess(argv: Sequence[str]) -> int:
         try:
             current = _collect_assessment_snapshot(timeout=timeout, only=args.only, skip=args.skip)
             assessment = assess_snapshot(current, baseline)
-            if args.json:
+            if args.guidance:
+                guidance = build_guidance(assessment)
+                if args.json:
+                    print(json.dumps(guidance, indent=2, ensure_ascii=False))
+                else:
+                    print(
+                        f"{render_assessment_human(assessment)}\n\n{render_guidance_human(guidance)}"
+                    )
+            elif args.json:
                 print(json.dumps(assessment, indent=2, ensure_ascii=False))
             else:
                 print(render_assessment_human(assessment))
@@ -298,7 +310,17 @@ def _run_assess(argv: Sequence[str]) -> int:
             print(f"rigpilot assess: {exc}", file=sys.stderr)
             return 2
 
-    if args.json:
+    if args.guidance:
+        try:
+            guidance = build_guidance(assessment)
+            if args.json:
+                print(json.dumps(guidance, indent=2, ensure_ascii=False))
+            else:
+                print(f"{render_assessment_human(assessment)}\n\n{render_guidance_human(guidance)}")
+        except Exception:  # noqa: BLE001 - Guidance failures must not expose private details.
+            print("rigpilot assess: guidance failed", file=sys.stderr)
+            return 1
+    elif args.json:
         print(json.dumps(assessment, indent=2, ensure_ascii=False))
     else:
         print(render_assessment_human(assessment))

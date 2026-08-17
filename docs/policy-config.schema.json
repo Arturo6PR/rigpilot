@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rigpilot:schema:policy-config:1.0",
+  "title": "RigPilot policy configuration",
+  "type": "object",
+  "required": ["policy_config_schema_version", "minimum_severity", "rule_groups", "checks", "fail_on"],
+  "properties": {
+    "policy_config_schema_version": { "const": "1.0" },
+    "minimum_severity": { "enum": ["critical", "warning", "info", null] },
+    "rule_groups": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["probes", "storage", "hardware", "bios"] }
+        }
+      ]
+    },
+    "checks": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": ["operating_system", "cpu", "memory", "storage", "python", "git", "nvidia_gpu", "system", "bios", "memory_modules", "physical_disks", "uptime"]
+          }
+        }
+      ]
+    },
+    "fail_on": { "enum": ["critical", "warning", "info", null] }
+  },
+  "additionalProperties": false
+}

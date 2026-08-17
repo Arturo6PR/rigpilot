@@ -1,0 +1,7 @@
+{
+  "policy_config_schema_version": "1.0",
+  "minimum_severity": "warning",
+  "rule_groups": ["bios", "storage", "probes", "storage"],
+  "checks": ["bios", "storage"],
+  "fail_on": "warning"
+}

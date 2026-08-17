@@ -5,6 +5,13 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Added
+
+- Deterministic `--format text|json` assessment rendering and safe `--output` file delivery for
+  scripts and CI systems, while preserving legacy output and exit codes.
+- Strict reusable policy configuration files through `--policy-file`, with schema validation
+  before snapshot loading or live collection.
+
 ## [0.6.0] - 2026-08-09
 
 ### Added

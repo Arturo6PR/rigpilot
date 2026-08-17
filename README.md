@@ -89,7 +89,39 @@ Assess a saved snapshot without collecting new telemetry:
 .\.venv\Scripts\python.exe -m rigpilot assess current.json
 .\.venv\Scripts\python.exe -m rigpilot assess current.json --baseline previous.json
 .\.venv\Scripts\python.exe -m rigpilot assess current.json --baseline previous.json --json
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --format json
 ```
+
+Assessment output defaults to `text`. Use `--format text` explicitly when useful, or use
+`--format json` for deterministic, versioned automation output. The legacy `--json` option remains
+supported and produces the same bytes as `--format json`. The JSON schema depends on the requested
+layers: assessment schema 1.0 by default, guidance schema 1.0 with `--guidance`, and policy schema
+1.0 with a policy. For example, a clean assessment begins:
+
+```json
+{
+  "assessment_schema_version": "1.0",
+  "snapshot_schema_version": "1.0",
+  "subject_collected_at_utc": "2026-08-08T17:00:00+00:00",
+  "baseline_collected_at_utc": null,
+  "summary": {
+    "highest_severity": null,
+    "counts": { "info": 0, "warning": 0, "critical": 0 }
+  },
+  "findings": []
+}
+```
+
+Write the selected rendering to a new file with `--output`:
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --format text --output assessment.txt
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --format json --output assessment.json
+```
+
+RigPilot creates the output as UTF-8 text with a final newline and refuses to overwrite an
+existing path. When `--output` succeeds, stdout is empty. Operational diagnostics use stderr, so
+JSON written to stdout is never mixed with error text.
 
 Collect and assess one read-only snapshot in memory without writing it to disk:
 
@@ -132,6 +164,28 @@ result usable as a CI decision:
 .\.venv\Scripts\python.exe -m rigpilot assess --live --guidance --policy --policy-fail-on warning
 ```
 
+Store the same selectors in a reusable strict policy configuration:
+
+```json
+{
+  "policy_config_schema_version": "1.0",
+  "minimum_severity": "warning",
+  "rule_groups": ["probes", "storage", "bios"],
+  "checks": ["storage", "bios"],
+  "fail_on": "warning"
+}
+```
+
+```powershell
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --policy-file rigpilot-policy.json --format json
+.\.venv\Scripts\python.exe -m rigpilot assess current.json --policy-file rigpilot-policy.json --format json --output assessment.json
+```
+
+`--policy-file` accepts UTF-8, UTF-8 with BOM, and BOM-marked UTF-16 JSON. It implies policy
+output and cannot be combined with `--policy` or inline `--policy-*` options. The file is strictly
+validated against policy-configuration schema 1.0 before a saved snapshot is loaded or live
+collection can start.
+
 Policy groups are `probes`, `storage`, `hardware`, and `bios`. Values within a group or check
 selector are ORed; severity, group, and check selectors are combined with AND. A minimum severity
 includes that severity and more severe findings. Omitted selectors mean all. User order and
@@ -148,8 +202,10 @@ view refers to findings by canonical index instead of copying them. Human output
 the canonical, displayed, and hidden finding counts. Findings alone still return exit code `0`;
 `--policy-fail-on` returns `3` only after output is emitted when a displayed finding reaches the
 threshold. Invalid arguments or saved inputs return `2`, and unexpected policy failures return
-`1` with a concise error. The policy layer is pure and read-only: it does not collect data,
-execute commands, contact vendors, or change the source report or workstation.
+`1` with a concise error. These exit codes are unchanged by `--format` or `--output`; a successful
+file write happens before the final policy decision code is returned. The policy layer is pure
+and read-only: it does not collect data, execute commands, contact vendors, or change the source
+report or workstation.
 
 Assessment reports incomplete probe coverage, low fixed-volume capacity, stable hardware identity
 changes, and missing, future, or five-year-old BIOS release dates. Both files are strictly
@@ -174,8 +230,8 @@ report more than one physical processor.
 JSON snapshots use schema version `1.0` and include the UTC collection timestamp, hostname, and
 per-check duration. The schema is published at `docs/snapshot.schema.json`; assessment output has
 its own version `1.0` schema at `docs/assessment.schema.json`, and opt-in guidance reports use
-`docs/guidance.schema.json`. Opt-in policy reports use `docs/policy.schema.json`. Hostnames,
-hardware
+`docs/guidance.schema.json`. Opt-in policy reports use `docs/policy.schema.json`, and reusable
+policy input uses `docs/policy-config.schema.json`. Hostnames, hardware
 serial-like identifiers, filesystem labels, and executable paths can be sensitive; inspect JSON
 before sharing it. RigPilot keeps snapshots local unless the user explicitly redirects or uploads
 the output.

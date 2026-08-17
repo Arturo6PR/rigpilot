@@ -22,6 +22,11 @@ from rigpilot.policy import (
     build_policy_report,
     render_policy_human,
 )
+from rigpilot.policy_config import load_policy_config
+
+
+class _OutputError(Exception):
+    """A concise user-facing output destination error."""
 
 
 def _format_binary_size(byte_count: float) -> str:
@@ -256,10 +261,28 @@ def build_assess_parser() -> argparse.ArgumentParser:
     parser.add_argument("--baseline", type=Path, help="earlier snapshot for hardware comparison")
     parser.add_argument("--json", action="store_true", help="emit structured JSON output")
     parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=("text", "json"),
+        help="assessment output format (default: text)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        metavar="PATH",
+        help="write assessment output to a new file instead of stdout",
+    )
+    parser.add_argument(
         "--guidance", action="store_true", help="include deterministic safe next-step guidance"
     )
     parser.add_argument(
         "--policy", action="store_true", help="apply a deterministic finding view and decision"
+    )
+    parser.add_argument(
+        "--policy-file",
+        type=Path,
+        metavar="PATH",
+        help="load a strict reusable policy configuration file",
     )
     parser.add_argument(
         "--policy-min-severity",
@@ -321,13 +344,66 @@ def _policy_from_args(args: argparse.Namespace) -> Policy:
     )
 
 
-def _emit_policy_report(source: dict[str, Any], policy: Policy, *, as_json: bool) -> int:
-    report = build_policy_report(source, policy)
+def _render_assessment_output(
+    assessment: dict[str, Any],
+    *,
+    policy: Policy | None,
+    include_guidance: bool,
+    as_json: bool,
+) -> tuple[str, int]:
+    if policy is not None:
+        source = build_guidance(assessment) if include_guidance else assessment
+        report = build_policy_report(source, policy)
+        rendered = (
+            json.dumps(report, indent=2, ensure_ascii=False)
+            if as_json
+            else render_policy_human(report)
+        )
+        return rendered, report["decision"]["exit_code"]
+    if include_guidance:
+        report = build_guidance(assessment)
+        rendered = (
+            json.dumps(report, indent=2, ensure_ascii=False)
+            if as_json
+            else f"{render_assessment_human(assessment)}\n\n{render_guidance_human(report)}"
+        )
+        return rendered, 0
     if as_json:
-        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return json.dumps(assessment, indent=2, ensure_ascii=False), 0
+    return render_assessment_human(assessment), 0
+
+
+def _validate_output_path(path: Path) -> None:
+    try:
+        if path.exists():
+            raise _OutputError(f"{path}: output path already exists")
+        if not path.parent.exists() or not path.parent.is_dir():
+            raise _OutputError(f"{path}: output directory does not exist")
+    except OSError as exc:
+        raise _OutputError(f"{path}: invalid output path") from exc
+
+
+def _write_output_file(path: Path, rendered: str) -> None:
+    created = False
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as stream:
+            created = True
+            stream.write(rendered)
+            stream.write("\n")
+    except OSError as exc:
+        if created:
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        raise _OutputError(f"{path}: could not write output") from exc
+
+
+def _deliver_assessment_output(rendered: str, output: Path | None) -> None:
+    if output is None:
+        print(rendered)
     else:
-        print(render_policy_human(report))
-    return report["decision"]["exit_code"]
+        _write_output_file(output, rendered)
 
 
 def _run_assess(argv: Sequence[str]) -> int:
@@ -339,18 +415,41 @@ def _run_assess(argv: Sequence[str]) -> int:
         parser.error("a current snapshot path is required unless --live is used")
     if not args.live and any(value is not None for value in (args.timeout, args.only, args.skip)):
         parser.error("--timeout, --only, and --skip require --live")
+    if args.json and args.output_format == "text":
+        parser.error("--json cannot be used with --format text")
+    as_json = args.json or args.output_format == "json"
     policy_options = (
         args.policy_min_severity,
         args.policy_groups,
         args.policy_checks,
         args.policy_fail_on,
     )
-    if not args.policy and any(value is not None for value in policy_options):
+    if args.policy_file is not None and (
+        args.policy or any(value is not None for value in policy_options)
+    ):
+        parser.error("--policy-file cannot be combined with --policy or --policy-* options")
+    if (
+        args.policy_file is None
+        and not args.policy
+        and any(value is not None for value in policy_options)
+    ):
         parser.error("--policy-* options require --policy")
+    if args.output is not None:
+        try:
+            _validate_output_path(args.output)
+        except _OutputError as exc:
+            print(f"rigpilot assess: {exc}", file=sys.stderr)
+            return 2
     try:
-        policy = _policy_from_args(args) if args.policy else None
-    except ValueError as exc:
-        parser.error(str(exc))
+        if args.policy_file is not None:
+            policy = load_policy_config(args.policy_file)
+        else:
+            policy = _policy_from_args(args) if args.policy else None
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        if args.policy_file is None:
+            parser.error(str(exc))
+        print(f"rigpilot assess: {exc}", file=sys.stderr)
+        return 2
     except Exception:  # noqa: BLE001 - Policy failures must not expose private details.
         if args.live:
             print("rigpilot assess: live assessment failed", file=sys.stderr)
@@ -371,25 +470,20 @@ def _run_assess(argv: Sequence[str]) -> int:
         try:
             current = _collect_assessment_snapshot(timeout=timeout, only=args.only, skip=args.skip)
             assessment = assess_snapshot(current, baseline)
-            if policy is not None:
-                source = build_guidance(assessment) if args.guidance else assessment
-                return _emit_policy_report(source, policy, as_json=args.json)
-            elif args.guidance:
-                guidance = build_guidance(assessment)
-                if args.json:
-                    print(json.dumps(guidance, indent=2, ensure_ascii=False))
-                else:
-                    print(
-                        f"{render_assessment_human(assessment)}\n\n{render_guidance_human(guidance)}"
-                    )
-            elif args.json:
-                print(json.dumps(assessment, indent=2, ensure_ascii=False))
-            else:
-                print(render_assessment_human(assessment))
+            rendered, exit_code = _render_assessment_output(
+                assessment,
+                policy=policy,
+                include_guidance=args.guidance,
+                as_json=as_json,
+            )
+            _deliver_assessment_output(rendered, args.output)
+        except _OutputError as exc:
+            print(f"rigpilot assess: {exc}", file=sys.stderr)
+            return 2
         except Exception:  # noqa: BLE001 - Prevent sensitive live failure details from leaking.
             print("rigpilot assess: live assessment failed", file=sys.stderr)
             return 1
-        return 0
+        return exit_code
     else:
         try:
             current = load_snapshot(args.current)
@@ -399,28 +493,26 @@ def _run_assess(argv: Sequence[str]) -> int:
             print(f"rigpilot assess: {exc}", file=sys.stderr)
             return 2
 
-    if policy is not None:
-        try:
-            source = build_guidance(assessment) if args.guidance else assessment
-            return _emit_policy_report(source, policy, as_json=args.json)
-        except Exception:  # noqa: BLE001 - Policy failures must not expose private details.
+    try:
+        rendered, exit_code = _render_assessment_output(
+            assessment,
+            policy=policy,
+            include_guidance=args.guidance,
+            as_json=as_json,
+        )
+        _deliver_assessment_output(rendered, args.output)
+    except _OutputError as exc:
+        print(f"rigpilot assess: {exc}", file=sys.stderr)
+        return 2
+    except Exception:  # noqa: BLE001 - Output failures must not expose private details.
+        if policy is not None:
             print("rigpilot assess: policy failed", file=sys.stderr)
-            return 1
-    elif args.guidance:
-        try:
-            guidance = build_guidance(assessment)
-            if args.json:
-                print(json.dumps(guidance, indent=2, ensure_ascii=False))
-            else:
-                print(f"{render_assessment_human(assessment)}\n\n{render_guidance_human(guidance)}")
-        except Exception:  # noqa: BLE001 - Guidance failures must not expose private details.
+        elif args.guidance:
             print("rigpilot assess: guidance failed", file=sys.stderr)
-            return 1
-    elif args.json:
-        print(json.dumps(assessment, indent=2, ensure_ascii=False))
-    else:
-        print(render_assessment_human(assessment))
-    return 0
+        else:
+            print("rigpilot assess: output failed", file=sys.stderr)
+        return 1
+    return exit_code
 
 
 def main(argv: Sequence[str] | None = None) -> int:

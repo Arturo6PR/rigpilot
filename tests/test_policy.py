@@ -603,7 +603,7 @@ class PolicySchemaTests(unittest.TestCase):
             with self.subTest(name=name):
                 validate_policy_report(load_fixture(name))
 
-    def test_wheel_contains_and_loads_all_four_packaged_schemas(self) -> None:
+    def test_wheel_contains_and_loads_all_five_packaged_schemas(self) -> None:
         project_root = Path(__file__).parents[1]
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
@@ -648,6 +648,7 @@ class PolicySchemaTests(unittest.TestCase):
                 "rigpilot/assessment.schema.json",
                 "rigpilot/guidance.schema.json",
                 "rigpilot/policy.schema.json",
+                "rigpilot/policy-config.schema.json",
             ):
                 self.assertIn(name, names)
             smoke_code = f"""
@@ -655,11 +656,13 @@ import sys
 sys.path.insert(0, {str(target_directory)!r})
 from importlib import resources
 from rigpilot.policy import _policy_validator
+from rigpilot.policy_config import _policy_config_validator
 package = resources.files('rigpilot')
-for name in ('snapshot.schema.json', 'assessment.schema.json', 'guidance.schema.json', 'policy.schema.json'):
+for name in ('snapshot.schema.json', 'assessment.schema.json', 'guidance.schema.json', 'policy.schema.json', 'policy-config.schema.json'):
     assert package.joinpath(name).is_file()
 _policy_validator()
-print('installed_policy_schema_smoke=PASS')
+_policy_config_validator()
+print('installed_schema_smoke=PASS')
 """
             completed = subprocess.run(
                 [sys.executable, "-I", "-c", smoke_code],
@@ -669,7 +672,7 @@ print('installed_policy_schema_smoke=PASS')
                 text=True,
                 env=environment,
             )
-            self.assertEqual(completed.stdout.strip(), "installed_policy_schema_smoke=PASS")
+            self.assertEqual(completed.stdout.strip(), "installed_schema_smoke=PASS")
 
 
 if __name__ == "__main__":

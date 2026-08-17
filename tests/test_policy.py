@@ -642,7 +642,16 @@ class PolicySchemaTests(unittest.TestCase):
             self.assertEqual(len(wheels), 1)
             with zipfile.ZipFile(wheels[0]) as archive:
                 names = set(archive.namelist())
+                metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
+                license_name = next(
+                    name for name in names if name.endswith(".dist-info/licenses/LICENSE")
+                )
+                metadata_lines = archive.read(metadata_name).decode("utf-8").splitlines()
+                packaged_license = archive.read(license_name)
                 archive.extractall(target_directory)
+            self.assertIn("License-Expression: Apache-2.0", metadata_lines)
+            self.assertIn("License-File: LICENSE", metadata_lines)
+            self.assertEqual(packaged_license, (project_root / "LICENSE").read_bytes())
             for name in (
                 "rigpilot/snapshot.schema.json",
                 "rigpilot/assessment.schema.json",

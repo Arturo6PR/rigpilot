@@ -98,9 +98,11 @@ diagnostics from corrupting downstream automation.
 ## Packaging and verification
 
 All five schemas are packaged with the wheel and loaded without relying on a source checkout.
-Tests lock the schemas, fixtures, CLI surface, exit codes, v0.7 policy compatibility, v0.8 report
-compatibility, v0.9 Action compatibility, privacy constraints, and output determinism. CI runs
-the Windows Python/PowerShell matrix and an Ubuntu Action job against synthetic fixtures.
+Wheel metadata declares the SPDX license expression `Apache-2.0` and carries the complete
+top-level [`LICENSE`](../LICENSE) text. Tests lock the schemas, fixtures, CLI surface, exit codes,
+v0.7 policy compatibility, v0.8 report compatibility, v0.9 Action compatibility, privacy
+constraints, output determinism, and packaged license metadata. CI runs the Windows
+Python/PowerShell matrix and an Ubuntu Action job against synthetic fixtures.
 
 The repository-owned [deterministic demo](../examples/github-actions) exercises the complete
 saved snapshot -> policy -> JSON report -> exit decision path twice without live collection.

@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Arturo6PR/rigpilot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Arturo6PR/rigpilot/actions/workflows/ci.yml)
 [![GitHub release](https://img.shields.io/github/v/release/Arturo6PR/rigpilot)](https://github.com/Arturo6PR/rigpilot/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.11-3.13](https://img.shields.io/badge/Python-3.11--3.13-3776AB)
 ![Read-only](https://img.shields.io/badge/workstation%20behavior-read--only-2E8B57)
 
@@ -179,6 +180,7 @@ snapshot, assessment, guidance, policy report, and policy configuration. See the
 
 ```text
 action.yml                    Composite GitHub Action contract
+LICENSE                       Apache License 2.0 terms
 src/rigpilot/                 Collectors, pure engines, CLI, and Action adapter
 docs/*.schema.json            Packaged strict JSON contracts
 docs/ARCHITECTURE.md          Components, data flow, and trust boundaries
@@ -222,3 +224,8 @@ expected evidence, and clean-install checks, see [Verification](docs/VERIFICATIO
 - [Project brief](docs/PROJECT_BRIEF.md)
 - [Changelog](CHANGELOG.md) and [v1.0.0 release notes](docs/RELEASE_NOTES_v1.0.0.md)
 - [Security reporting guidance](SECURITY.md)
+
+## License
+
+RigPilot is licensed under the [Apache License 2.0](LICENSE). Package metadata uses the SPDX
+identifier `Apache-2.0`, and built distributions include the complete license text.

@@ -31,3 +31,9 @@ interface. See [`COMPATIBILITY.md`](COMPATIBILITY.md) for their exact stability 
 Windows 11 and PowerShell are the primary inventory environment. The saved-snapshot assessment
 and composite GitHub Action are also exercised on GitHub's Ubuntu runner. CI covers Python
 3.11-3.13, Windows PowerShell 5.1, and PowerShell 7.
+
+## License
+
+RigPilot source code and documentation are distributed under the
+[Apache License 2.0](../LICENSE), declared in package metadata with the SPDX identifier
+`Apache-2.0`.

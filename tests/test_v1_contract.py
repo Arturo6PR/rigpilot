@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import re
@@ -236,6 +237,21 @@ class V1ActionAndPackagingContractTests(unittest.TestCase):
         self.assertNotIn("version", project["project"])
         self.assertEqual(project["project"]["dynamic"], ["version"])
         self.assertEqual(project["tool"]["hatch"]["version"]["path"], "src/rigpilot/__init__.py")
+
+    def test_repository_and_package_metadata_declare_exact_apache_license(self) -> None:
+        project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        license_text = (PROJECT_ROOT / "LICENSE").read_text(encoding="utf-8")
+
+        self.assertEqual(project["project"]["license"], "Apache-2.0")
+        self.assertEqual(project["project"]["license-files"], ["LICENSE"])
+        self.assertEqual(
+            project["project"]["urls"]["License"],
+            "https://github.com/Arturo6PR/rigpilot/blob/main/LICENSE",
+        )
+        self.assertEqual(
+            hashlib.sha256(license_text.encode("utf-8")).hexdigest(),
+            "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        )
 
 
 if __name__ == "__main__":

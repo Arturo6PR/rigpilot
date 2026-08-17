@@ -5,6 +5,10 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Added
+
+- Apache License 2.0 terms, SPDX package metadata, and distribution-level license inclusion.
+
 ### Documentation
 
 - Reorganized the README around a five-minute synthetic proof, system architecture, GitHub

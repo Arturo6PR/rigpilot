@@ -23,6 +23,7 @@ class DocumentationPresentationTests(unittest.TestCase):
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("actions/workflows/ci.yml/badge.svg", readme)
+        self.assertIn("license-Apache--2.0", readme)
         self.assertLess(
             readme.index("## Five-minute quickstart"), readme.index("## How it fits together")
         )
@@ -30,6 +31,7 @@ class DocumentationPresentationTests(unittest.TestCase):
         self.assertIn("Arturo6PR/rigpilot@v1", readme)
         self.assertIn("examples\\github-actions\\Run-Demo.ps1", readme)
         self.assertIn("## Repository map", readme)
+        self.assertIn("## License", readme)
 
     def test_all_repository_documentation_links_resolve(self) -> None:
         markdown_files = [

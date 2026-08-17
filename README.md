@@ -236,6 +236,70 @@ serial-like identifiers, filesystem labels, and executable paths can be sensitiv
 before sharing it. RigPilot keeps snapshots local unless the user explicitly redirects or uploads
 the output.
 
+## GitHub Actions policy gate
+
+RigPilot can apply a saved-snapshot policy as a native GitHub Actions step:
+
+```yaml
+name: RigPilot
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  rigpilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Apply RigPilot policy
+        id: rigpilot
+        uses: Arturo6PR/rigpilot@v0.9.0
+        with:
+          snapshot: current.json
+          policy: .rigpilot/rigpilot-policy.json
+          report: rigpilot-assessment.json
+```
+
+The Action accepts these inputs:
+
+| Input | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `snapshot` | yes | — | Saved snapshot JSON inside the checked-out workspace. |
+| `policy` | yes | — | Policy-configuration-schema-1.0 JSON inside the workspace. |
+| `report` | no | `rigpilot-assessment.json` | New workspace-relative JSON report path. |
+| `python-version` | no | `3.12` | Python version used to run RigPilot. |
+
+It exposes `status`, `passed`, `warnings`, `failed`, `critical`, `report`, `exit_code`, and
+`summary` outputs. `failed` is the number of canonical findings referenced by the policy
+decision; `passed` is a Boolean policy-gate result rather than an invented count of rules that
+the assessment report does not claim to have evaluated.
+
+The Action uses the unchanged policy-schema-1.0 report from v0.8.0 as its source of truth. It
+writes the complete deterministic JSON report before returning the policy decision, adds a
+compact GitHub Step Summary with counts and policy-triggering rule IDs, and keeps the report in
+the workspace for downstream parsing or an optional official artifact-upload step. A successful
+gate returns `0`; a triggered policy returns `3` and fails the step after its report and summary
+are written. Input/configuration errors return `2`, and unexpected internal failures return `1`.
+
+Inputs are passed through environment variables and Python argument arrays rather than shell
+interpolation. Snapshot, policy, and report paths must remain inside `GITHUB_WORKSPACE`; the
+report parent must already exist, and RigPilot refuses to overwrite an existing path. The Action
+does not use `GITHUB_TOKEN`, collect runner telemetry, contact a RigPilot service, or change the
+runner. The caller only needs `contents: read` for checkout.
+
+The local equivalent is:
+
+```powershell
+rigpilot assess current.json --policy-file .rigpilot/rigpilot-policy.json --format json --output rigpilot-assessment.json
+```
+
+See [`examples/github-actions`](examples/github-actions) for a copyable workflow, policy, and
+snapshot-origin guidance.
+
 ## Development checks
 
 Run the standard-library unit tests, Ruff, and package import check:
@@ -248,6 +312,8 @@ Tests cover parsers, missing commands, invalid and expired timeouts, operating-s
 nonzero exits, malformed output, multiple CPUs and GPUs, safe command construction, snapshot
 assembly, collector selection, snapshot comparison, deterministic assessment rules, privacy,
 schema validation, deterministic guidance and policy views, policy decisions, and output modes.
+The suite also verifies the GitHub Action summary, outputs, path isolation, error distinctions,
+and pass, warning, and fail policy behavior against deterministic fixtures.
 
 ## Current limitations
 

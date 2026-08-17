@@ -1,0 +1,68 @@
+name: RigPilot policy gate
+description: Assess a saved RigPilot snapshot with a reusable policy and expose CI-native results.
+author: Arturo Rivera
+
+inputs:
+  snapshot:
+    description: Workspace-relative path to a RigPilot snapshot JSON file.
+    required: true
+  policy:
+    description: Workspace-relative path to a RigPilot policy configuration JSON file.
+    required: true
+  report:
+    description: Workspace-relative path for the new structured JSON report.
+    required: false
+    default: rigpilot-assessment.json
+  python-version:
+    description: Python version used to run RigPilot.
+    required: false
+    default: "3.12"
+
+outputs:
+  status:
+    description: "Policy gate status: pass, fail, or error."
+    value: ${{ steps.gate.outputs.status }}
+  passed:
+    description: Whether the policy gate passed.
+    value: ${{ steps.gate.outputs.passed }}
+  warnings:
+    description: Number of displayed warning findings.
+    value: ${{ steps.gate.outputs.warnings }}
+  failed:
+    description: Number of findings that triggered the policy decision.
+    value: ${{ steps.gate.outputs.failed }}
+  critical:
+    description: Number of displayed critical findings.
+    value: ${{ steps.gate.outputs.critical }}
+  report:
+    description: Workspace-relative path to the structured policy report.
+    value: ${{ steps.gate.outputs.report }}
+  exit_code:
+    description: "RigPilot exit code: 0, 1, 2, or 3."
+    value: ${{ steps.gate.outputs.exit_code }}
+  summary:
+    description: Whether the GitHub Step Summary was written successfully.
+    value: ${{ steps.gate.outputs.summary }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install RigPilot
+      shell: pwsh
+      run: python -m pip install --disable-pip-version-check --no-input "$env:GITHUB_ACTION_PATH"
+    - name: Run RigPilot policy gate
+      id: gate
+      shell: pwsh
+      env:
+        RIGPILOT_ACTION_SNAPSHOT: ${{ inputs.snapshot }}
+        RIGPILOT_ACTION_POLICY: ${{ inputs.policy }}
+        RIGPILOT_ACTION_REPORT: ${{ inputs.report }}
+      run: python -m rigpilot.github_action
+
+branding:
+  icon: shield
+  color: blue

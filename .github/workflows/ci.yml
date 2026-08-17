@@ -18,8 +18,8 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
         shell: [powershell, pwsh]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -40,3 +40,62 @@ jobs:
         run: .\.venv\Scripts\python.exe -m pytest -q
       - name: Check formatting
         run: .\.venv\Scripts\python.exe -m ruff format --check .
+
+  action:
+    name: GitHub Action / deterministic fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Clean assessment passes
+        id: clean
+        uses: ./
+        with:
+          snapshot: tests/fixtures/snapshot-success-v1.json
+          policy: tests/fixtures/policy-config-v1.json
+          report: rigpilot-clean.json
+      - name: Warning assessment passes a critical-only policy
+        id: warning
+        uses: ./
+        with:
+          snapshot: tests/fixtures/snapshot-failure-v1.json
+          policy: tests/fixtures/policy-config-critical-v1.json
+          report: rigpilot-warning.json
+      - name: Warning assessment fails a warning policy
+        id: failure
+        continue-on-error: true
+        uses: ./
+        with:
+          snapshot: tests/fixtures/snapshot-failure-v1.json
+          policy: tests/fixtures/policy-config-v1.json
+          report: rigpilot-failure.json
+      - name: Verify Action outputs and reports
+        shell: pwsh
+        env:
+          CLEAN_STATUS: ${{ steps.clean.outputs.status }}
+          CLEAN_PASSED: ${{ steps.clean.outputs.passed }}
+          CLEAN_REPORT: ${{ steps.clean.outputs.report }}
+          CLEAN_SUMMARY: ${{ steps.clean.outputs.summary }}
+          WARNING_STATUS: ${{ steps.warning.outputs.status }}
+          WARNING_COUNT: ${{ steps.warning.outputs.warnings }}
+          WARNING_FAILED: ${{ steps.warning.outputs.failed }}
+          WARNING_REPORT: ${{ steps.warning.outputs.report }}
+          FAILURE_OUTCOME: ${{ steps.failure.outcome }}
+          FAILURE_STATUS: ${{ steps.failure.outputs.status }}
+          FAILURE_PASSED: ${{ steps.failure.outputs.passed }}
+          FAILURE_COUNT: ${{ steps.failure.outputs.failed }}
+          FAILURE_EXIT: ${{ steps.failure.outputs.exit_code }}
+          FAILURE_REPORT: ${{ steps.failure.outputs.report }}
+          FAILURE_SUMMARY: ${{ steps.failure.outputs.summary }}
+        run: |
+          if ($env:CLEAN_STATUS -ne 'pass' -or $env:CLEAN_PASSED -ne 'true') { throw 'clean gate mismatch' }
+          if ($env:CLEAN_REPORT -ne 'rigpilot-clean.json' -or $env:CLEAN_SUMMARY -ne 'true') { throw 'clean metadata mismatch' }
+          if ($env:WARNING_STATUS -ne 'pass' -or [int]$env:WARNING_COUNT -le 0 -or $env:WARNING_FAILED -ne '0') { throw 'warning gate mismatch' }
+          if ($env:FAILURE_OUTCOME -ne 'failure' -or $env:FAILURE_STATUS -ne 'fail') { throw 'failure outcome mismatch' }
+          if ($env:FAILURE_PASSED -ne 'false' -or [int]$env:FAILURE_COUNT -le 0 -or $env:FAILURE_EXIT -ne '3') { throw 'failure outputs mismatch' }
+          if ($env:FAILURE_REPORT -ne 'rigpilot-failure.json' -or $env:FAILURE_SUMMARY -ne 'true') { throw 'failure metadata mismatch' }
+          $clean = Get-Content -Raw $env:CLEAN_REPORT | ConvertFrom-Json
+          $warning = Get-Content -Raw $env:WARNING_REPORT | ConvertFrom-Json
+          $failure = Get-Content -Raw $env:FAILURE_REPORT | ConvertFrom-Json
+          if ($clean.policy_schema_version -ne '1.0' -or $clean.decision.triggered) { throw 'clean report mismatch' }
+          if ($warning.policy_schema_version -ne '1.0' -or $warning.decision.triggered -or $warning.view.summary.counts.warning -le 0) { throw 'warning report mismatch' }
+          if ($failure.policy_schema_version -ne '1.0' -or -not $failure.decision.triggered) { throw 'failure report mismatch' }

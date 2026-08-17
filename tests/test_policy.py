@@ -655,6 +655,7 @@ class PolicySchemaTests(unittest.TestCase):
 import sys
 sys.path.insert(0, {str(target_directory)!r})
 from importlib import resources
+from rigpilot.github_action import build_action_result
 from rigpilot.policy import _policy_validator
 from rigpilot.policy_config import _policy_config_validator
 package = resources.files('rigpilot')
@@ -662,6 +663,7 @@ for name in ('snapshot.schema.json', 'assessment.schema.json', 'guidance.schema.
     assert package.joinpath(name).is_file()
 _policy_validator()
 _policy_config_validator()
+assert callable(build_action_result)
 print('installed_schema_smoke=PASS')
 """
             completed = subprocess.run(

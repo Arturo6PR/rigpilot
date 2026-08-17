@@ -1,0 +1,53 @@
+name: Released Action smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  released-action:
+    name: Arturo6PR/rigpilot@v0.9.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Released passing policy gate
+        id: passing
+        uses: Arturo6PR/rigpilot@v0.9.0
+        with:
+          snapshot: tests/fixtures/snapshot-success-v1.json
+          policy: tests/fixtures/policy-config-v1.json
+          report: released-pass.json
+      - name: Released failing policy gate
+        id: failing
+        continue-on-error: true
+        uses: Arturo6PR/rigpilot@v0.9.0
+        with:
+          snapshot: tests/fixtures/snapshot-failure-v1.json
+          policy: tests/fixtures/policy-config-v1.json
+          report: released-fail.json
+      - name: Verify released Action
+        shell: pwsh
+        env:
+          PASS_STATUS: ${{ steps.passing.outputs.status }}
+          PASS_PASSED: ${{ steps.passing.outputs.passed }}
+          PASS_REPORT: ${{ steps.passing.outputs.report }}
+          PASS_SUMMARY: ${{ steps.passing.outputs.summary }}
+          FAIL_OUTCOME: ${{ steps.failing.outcome }}
+          FAIL_STATUS: ${{ steps.failing.outputs.status }}
+          FAIL_PASSED: ${{ steps.failing.outputs.passed }}
+          FAIL_COUNT: ${{ steps.failing.outputs.failed }}
+          FAIL_EXIT: ${{ steps.failing.outputs.exit_code }}
+          FAIL_REPORT: ${{ steps.failing.outputs.report }}
+          FAIL_SUMMARY: ${{ steps.failing.outputs.summary }}
+        run: |
+          if ($env:PASS_STATUS -ne 'pass' -or $env:PASS_PASSED -ne 'true') { throw 'released pass mismatch' }
+          if ($env:PASS_REPORT -ne 'released-pass.json' -or $env:PASS_SUMMARY -ne 'true') { throw 'released pass metadata mismatch' }
+          if ($env:FAIL_OUTCOME -ne 'failure' -or $env:FAIL_STATUS -ne 'fail') { throw 'released failure mismatch' }
+          if ($env:FAIL_PASSED -ne 'false' -or [int]$env:FAIL_COUNT -le 0 -or $env:FAIL_EXIT -ne '3') { throw 'released failure outputs mismatch' }
+          if ($env:FAIL_REPORT -ne 'released-fail.json' -or $env:FAIL_SUMMARY -ne 'true') { throw 'released failure metadata mismatch' }
+          $pass = Get-Content -Raw $env:PASS_REPORT | ConvertFrom-Json
+          $fail = Get-Content -Raw $env:FAIL_REPORT | ConvertFrom-Json
+          if ($pass.policy_schema_version -ne '1.0' -or $pass.decision.triggered) { throw 'released pass report mismatch' }
+          if ($fail.policy_schema_version -ne '1.0' -or -not $fail.decision.triggered) { throw 'released fail report mismatch' }

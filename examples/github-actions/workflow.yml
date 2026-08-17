@@ -1,0 +1,30 @@
+name: RigPilot
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  rigpilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Apply RigPilot policy
+        id: rigpilot
+        uses: Arturo6PR/rigpilot@v0.9.0
+        with:
+          snapshot: current.json
+          policy: .rigpilot/rigpilot-policy.json
+          report: rigpilot-assessment.json
+
+      # The report remains in the workspace for later steps or an official artifact upload step.
+      - name: Show report location
+        if: always()
+        shell: bash
+        env:
+          RIGPILOT_REPORT: ${{ steps.rigpilot.outputs.report }}
+        run: |
+          printf 'RigPilot report: %s\n' "$RIGPILOT_REPORT"

@@ -5,6 +5,13 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Added
+
+- Native composite GitHub Action for saved-snapshot policy gates, including deterministic JSON
+  reports, GitHub Step Summaries, structured outputs, and exact policy exit propagation.
+- Deterministic CI dogfood and a manual released-tag smoke workflow covering passing, warning,
+  and failing policy behavior without live collection.
+
 ## [0.8.0] - 2026-08-17
 
 ### Added

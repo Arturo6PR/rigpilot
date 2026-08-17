@@ -288,8 +288,9 @@ are written. Input/configuration errors return `2`, and unexpected internal fail
 Inputs are passed through environment variables and Python argument arrays rather than shell
 interpolation. Snapshot, policy, and report paths must remain inside `GITHUB_WORKSPACE`; the
 report parent must already exist, and RigPilot refuses to overwrite an existing path. The Action
-does not use `GITHUB_TOKEN`, collect runner telemetry, contact a RigPilot service, or change the
-runner. The caller only needs `contents: read` for checkout.
+does not require user-provided secrets or broader token permissions, collect runner telemetry,
+contact a RigPilot service, or change the runner. The caller only needs `contents: read` for
+checkout and the official Python setup step.
 
 The local equivalent is:
 

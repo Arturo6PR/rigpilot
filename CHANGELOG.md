@@ -5,6 +5,13 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+### Documentation
+
+- Reorganized the README around a five-minute synthetic proof, system architecture, GitHub
+  Actions adoption, public contracts, and first-time project navigation.
+- Added focused architecture, CLI, and verification references plus a CI-run deterministic demo
+  covering passing and failing policy gates without live collection.
+
 ## [1.0.0] - 2026-08-17
 
 ### Added

@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "collected_at_utc": "2026-08-08T17:00:00+00:00",
+  "hostname": null,
+  "checks": {
+    "operating_system": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "cpu": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "memory": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "storage": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "python": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "git": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "nvidia_gpu": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "system": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "bios": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "memory_modules": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "physical_disks": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 },
+    "uptime": { "status": "failed", "data": null, "message": "synthetic probe failure", "duration_ms": 1.0 }
+  }
+}

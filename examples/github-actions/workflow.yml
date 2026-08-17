@@ -21,10 +21,16 @@ jobs:
           report: rigpilot-assessment.json
 
       # The report remains in the workspace for later steps or an official artifact upload step.
-      - name: Show report location
+      - name: Show RigPilot outputs
         if: always()
         shell: bash
         env:
+          RIGPILOT_STATUS: ${{ steps.rigpilot.outputs.status }}
+          RIGPILOT_PASSED: ${{ steps.rigpilot.outputs.passed }}
+          RIGPILOT_WARNINGS: ${{ steps.rigpilot.outputs.warnings }}
+          RIGPILOT_FAILED: ${{ steps.rigpilot.outputs.failed }}
           RIGPILOT_REPORT: ${{ steps.rigpilot.outputs.report }}
         run: |
+          printf 'RigPilot status: %s (passed=%s, warnings=%s, failed=%s)\n' \
+            "$RIGPILOT_STATUS" "$RIGPILOT_PASSED" "$RIGPILOT_WARNINGS" "$RIGPILOT_FAILED"
           printf 'RigPilot report: %s\n' "$RIGPILOT_REPORT"

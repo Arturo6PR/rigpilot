@@ -99,3 +99,6 @@ jobs:
           if ($clean.policy_schema_version -ne '1.0' -or $clean.decision.triggered) { throw 'clean report mismatch' }
           if ($warning.policy_schema_version -ne '1.0' -or $warning.decision.triggered -or $warning.view.summary.counts.warning -le 0) { throw 'warning report mismatch' }
           if ($failure.policy_schema_version -ne '1.0' -or -not $failure.decision.triggered) { throw 'failure report mismatch' }
+      - name: Run deterministic documentation demo
+        shell: pwsh
+        run: ./examples/github-actions/Run-Demo.ps1 -Python python

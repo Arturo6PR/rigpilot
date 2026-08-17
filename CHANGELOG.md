@@ -5,6 +5,8 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-17
+
 ### Added
 
 - Native composite GitHub Action for saved-snapshot policy gates, including deterministic JSON
@@ -75,7 +77,8 @@ Versioning, and dates use ISO 8601.
 - `--redact` and `--no-hostname` privacy controls.
 - Golden success and failure snapshot fixtures for compatibility testing.
 
-[Unreleased]: https://github.com/Arturo6PR/rigpilot/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Arturo6PR/rigpilot/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.6.0...v0.8.0
 [0.6.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.4.0...v0.5.0

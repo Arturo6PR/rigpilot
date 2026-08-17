@@ -10,6 +10,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 
+from rigpilot import __version__
 from rigpilot.assessment import assess_snapshot, render_assessment_human
 from rigpilot.collectors import CHECK_NAMES, collect_snapshot
 from rigpilot.diffing import compare_snapshots, load_snapshot, render_diff_human, validate_snapshot
@@ -23,6 +24,8 @@ from rigpilot.policy import (
     render_policy_human,
 )
 from rigpilot.policy_config import load_policy_config
+
+_CHECK_NAMES_HELP = ", ".join(sorted(CHECK_NAMES))
 
 
 class _OutputError(Exception):
@@ -169,7 +172,19 @@ def render_human(snapshot: Snapshot, *, redact: bool = False, include_hostname: 
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Collect a read-only Windows system snapshot.")
+    parser = argparse.ArgumentParser(
+        prog="rigpilot",
+        description="Collect a read-only Windows system snapshot.",
+        epilog=(
+            "Commands:\n"
+            "  rigpilot diff BEFORE AFTER   Compare two saved snapshots.\n"
+            "  rigpilot assess [CURRENT]    Assess a saved or live snapshot.\n\n"
+            f"Valid checks: {_CHECK_NAMES_HELP}\n\n"
+            "Run 'rigpilot COMMAND --help' for command-specific options."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--json", action="store_true", help="emit structured JSON output")
     parser.add_argument(
         "--redact",
@@ -252,7 +267,14 @@ def _run_diff(argv: Sequence[str]) -> int:
 
 def build_assess_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="rigpilot assess", description="Assess a saved or live system snapshot."
+        prog="rigpilot assess",
+        description="Assess a saved or live system snapshot.",
+        epilog=(
+            f"Valid live checks: {_CHECK_NAMES_HELP}\n"
+            "Policy groups: probes, storage, hardware, bios.\n"
+            "Policy severities: critical, warning, info."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("current", nargs="?", type=Path, help="saved snapshot JSON file to assess")
     parser.add_argument(

@@ -14,10 +14,10 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Apply RigPilot policy
         id: rigpilot
-        uses: Arturo6PR/rigpilot@v0.9.0
+        uses: Arturo6PR/rigpilot@v1
         with:
-          snapshot: current.json
-          policy: .rigpilot/rigpilot-policy.json
+          snapshot: examples/github-actions/current.json
+          policy: examples/github-actions/rigpilot-policy.json
           report: rigpilot-assessment.json
 
       # The report remains in the workspace for later steps or an official artifact upload step.

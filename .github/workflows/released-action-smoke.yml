@@ -8,21 +8,28 @@ permissions:
 
 jobs:
   released-action:
-    name: Arturo6PR/rigpilot@v0.9.0
+    name: Arturo6PR/rigpilot@v1
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Released passing policy gate
         id: passing
-        uses: Arturo6PR/rigpilot@v0.9.0
+        uses: Arturo6PR/rigpilot@v1.0.0
         with:
           snapshot: tests/fixtures/snapshot-success-v1.json
           policy: tests/fixtures/policy-config-v1.json
           report: released-pass.json
+      - name: Major-alias passing policy gate
+        id: alias
+        uses: Arturo6PR/rigpilot@v1
+        with:
+          snapshot: tests/fixtures/snapshot-success-v1.json
+          policy: tests/fixtures/policy-config-v1.json
+          report: released-alias-pass.json
       - name: Released failing policy gate
         id: failing
         continue-on-error: true
-        uses: Arturo6PR/rigpilot@v0.9.0
+        uses: Arturo6PR/rigpilot@v1.0.0
         with:
           snapshot: tests/fixtures/snapshot-failure-v1.json
           policy: tests/fixtures/policy-config-v1.json
@@ -34,6 +41,10 @@ jobs:
           PASS_PASSED: ${{ steps.passing.outputs.passed }}
           PASS_REPORT: ${{ steps.passing.outputs.report }}
           PASS_SUMMARY: ${{ steps.passing.outputs.summary }}
+          ALIAS_STATUS: ${{ steps.alias.outputs.status }}
+          ALIAS_PASSED: ${{ steps.alias.outputs.passed }}
+          ALIAS_REPORT: ${{ steps.alias.outputs.report }}
+          ALIAS_SUMMARY: ${{ steps.alias.outputs.summary }}
           FAIL_OUTCOME: ${{ steps.failing.outcome }}
           FAIL_STATUS: ${{ steps.failing.outputs.status }}
           FAIL_PASSED: ${{ steps.failing.outputs.passed }}
@@ -44,10 +55,14 @@ jobs:
         run: |
           if ($env:PASS_STATUS -ne 'pass' -or $env:PASS_PASSED -ne 'true') { throw 'released pass mismatch' }
           if ($env:PASS_REPORT -ne 'released-pass.json' -or $env:PASS_SUMMARY -ne 'true') { throw 'released pass metadata mismatch' }
+          if ($env:ALIAS_STATUS -ne 'pass' -or $env:ALIAS_PASSED -ne 'true') { throw 'major alias pass mismatch' }
+          if ($env:ALIAS_REPORT -ne 'released-alias-pass.json' -or $env:ALIAS_SUMMARY -ne 'true') { throw 'major alias metadata mismatch' }
           if ($env:FAIL_OUTCOME -ne 'failure' -or $env:FAIL_STATUS -ne 'fail') { throw 'released failure mismatch' }
           if ($env:FAIL_PASSED -ne 'false' -or [int]$env:FAIL_COUNT -le 0 -or $env:FAIL_EXIT -ne '3') { throw 'released failure outputs mismatch' }
           if ($env:FAIL_REPORT -ne 'released-fail.json' -or $env:FAIL_SUMMARY -ne 'true') { throw 'released failure metadata mismatch' }
           $pass = Get-Content -Raw $env:PASS_REPORT | ConvertFrom-Json
+          $alias = Get-Content -Raw $env:ALIAS_REPORT | ConvertFrom-Json
           $fail = Get-Content -Raw $env:FAIL_REPORT | ConvertFrom-Json
           if ($pass.policy_schema_version -ne '1.0' -or $pass.decision.triggered) { throw 'released pass report mismatch' }
+          if ($alias.policy_schema_version -ne '1.0' -or $alias.decision.triggered) { throw 'major alias report mismatch' }
           if ($fail.policy_schema_version -ne '1.0' -or -not $fail.decision.triggered) { throw 'released fail report mismatch' }

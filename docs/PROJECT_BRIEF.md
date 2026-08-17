@@ -2,30 +2,32 @@
 
 ## Purpose
 
-Help the user understand and eventually optimize a Windows AI workstation through transparent, safe diagnostics.
+Help users understand a Windows AI workstation through transparent, deterministic, read-only
+inventory and assessment.
 
-## First milestone
+## Stable v1 scope
 
-A tested, read-only CLI system snapshot with human-readable and JSON output.
+RigPilot provides:
 
-## Non-goals for milestone one
+- timeout-bounded Windows inventory with explicit successful, unavailable, and failed probes;
+- strict saved-snapshot comparison and deterministic assessment;
+- reusable policy files and versioned JSON reports for local automation;
+- safe, opt-in guidance that never executes its recommendations; and
+- a thin GitHub Action that applies the same CLI policy gate to repository-owned snapshots.
 
-- Automatic optimization
-- Driver or firmware changes
-- Registry, service, startup, or power-plan changes
-- Remote telemetry or cloud accounts
+The v1 public contracts are the documented CLI, exit codes, schema-1.0 formats, and GitHub Action
+interface. See [`COMPATIBILITY.md`](COMPATIBILITY.md) for their exact stability boundary.
 
-## Success criteria
+## Safety boundaries
 
-- Works from PowerShell in Warp.
-- Missing NVIDIA tooling does not crash the program.
-- Output distinguishes known, unavailable, and failed checks.
-- Unit tests cover parsing and failure paths.
+- No automatic optimization or remediation.
+- No driver, firmware, registry, service, startup, or power-plan changes.
+- No remote telemetry, RigPilot cloud account, or vendor contact.
+- Live collection is explicit, read-only, independently bounded, and never used by the GitHub
+  Action.
 
-## Current implementation
+## Supported environment
 
-The first milestone is implemented as a Python CLI with human-readable and JSON output. Every
-probe is independently marked as successful, unavailable, or failed. External commands are
-shell-free and bounded by a configurable timeout, and NVIDIA tooling is optional.
-Schema version 1.0 adds collection metadata, per-check durations, hardware identity, BIOS,
-physical memory, physical disks, uptime, and optional live NVIDIA utilization and temperature.
+Windows 11 and PowerShell are the primary inventory environment. The saved-snapshot assessment
+and composite GitHub Action are also exercised on GitHub's Ubuntu runner. CI covers Python
+3.11-3.13, Windows PowerShell 5.1, and PowerShell 7.

@@ -1,9 +1,15 @@
 [project]
 name = "rigpilot"
-version = "0.9.0"
+dynamic = ["version"]
 description = "Windows-first workstation inventory and diagnostics"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["jsonschema[format]>=4.23", "referencing>=0.28.4"]
+
+[project.urls]
+Homepage = "https://github.com/Arturo6PR/rigpilot"
+Repository = "https://github.com/Arturo6PR/rigpilot"
+Changelog = "https://github.com/Arturo6PR/rigpilot/blob/main/CHANGELOG.md"
 
 [project.scripts]
 rigpilot = "rigpilot.cli:main"
@@ -14,6 +20,9 @@ dev = ["pytest>=8", "ruff>=0.6"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/rigpilot/__init__.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

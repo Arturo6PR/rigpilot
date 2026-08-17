@@ -387,7 +387,8 @@ class GitHubActionMetadataTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", released)
         self.assertNotIn("push:", released)
         self.assertNotIn("pull_request:", released)
-        self.assertIn("uses: Arturo6PR/rigpilot@v0.9.0", released)
+        self.assertIn("uses: Arturo6PR/rigpilot@v1.0.0", released)
+        self.assertIn("uses: Arturo6PR/rigpilot@v1", released)
         self.assertIn("permissions:\n  contents: read", released)
 
     def test_both_policy_config_fixtures_are_strictly_valid(self) -> None:

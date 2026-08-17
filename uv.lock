@@ -212,7 +212,6 @@ wheels = [
 
 [[package]]
 name = "rigpilot"
-version = "0.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema", extra = ["format"] },

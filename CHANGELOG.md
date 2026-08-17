@@ -5,6 +5,24 @@ Versioning, and dates use ISO 8601.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-17
+
+### Added
+
+- An explicit v1 public compatibility contract covering CLI commands and options, exit codes,
+  all schema-1.0 formats, and the GitHub Action input/output and failure interface.
+- A package-backed `rigpilot --version` command, five-minute quickstart, canonical deterministic
+  snapshot-to-CI example, and security reporting guidance.
+- Behavioral compatibility tests for pre-v1 policy files, v0.8 structured reports, v0.9 Action
+  workflows, deterministic output, and exact public interface names.
+
+### Changed
+
+- Package metadata now derives its version from the package's single authoritative version
+  source and includes README and project links.
+- GitHub Action documentation uses the compatible `v1` major alias while retaining an exact
+  `v1.0.0` option and immutable commit-SHA guidance.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added
@@ -77,7 +95,8 @@ Versioning, and dates use ISO 8601.
 - `--redact` and `--no-hostname` privacy controls.
 - Golden success and failure snapshot fixtures for compatibility testing.
 
-[Unreleased]: https://github.com/Arturo6PR/rigpilot/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Arturo6PR/rigpilot/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.6.0...v0.8.0
 [0.6.0]: https://github.com/Arturo6PR/rigpilot/compare/v0.5.0...v0.6.0

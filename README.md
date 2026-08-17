@@ -4,12 +4,66 @@ RigPilot is a Windows-first workstation intelligence assistant. It provides a sa
 system inventory covering the operating system, system model, BIOS, CPU, physical memory,
 logical and physical storage, uptime, Python, Git, and NVIDIA GPUs.
 
+## Five-minute quickstart
+
+RigPilot requires Python 3.11 or newer. From a clone of this repository, create an isolated
+environment and install the package:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install .
+.\.venv\Scripts\rigpilot.exe --version
+.\.venv\Scripts\rigpilot.exe --help
+```
+
+Collect one local snapshot without a hostname, then assess the saved file without collecting
+again:
+
+```powershell
+.\.venv\Scripts\rigpilot.exe --json --no-hostname > current.json
+.\.venv\Scripts\rigpilot.exe assess current.json
+```
+
+Create `rigpilot-policy.json`:
+
+```json
+{
+  "policy_config_schema_version": "1.0",
+  "minimum_severity": "warning",
+  "rule_groups": ["probes", "storage", "hardware", "bios"],
+  "checks": null,
+  "fail_on": "warning"
+}
+```
+
+Produce the deterministic policy report. Exit code `3` means the report was written and the
+configured policy threshold triggered:
+
+```powershell
+.\.venv\Scripts\rigpilot.exe assess current.json --policy-file rigpilot-policy.json --format json --output assessment.json
+```
+
+Use the same snapshot and policy in GitHub Actions:
+
+```yaml
+- uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+- uses: Arturo6PR/rigpilot@v1
+  with:
+    snapshot: current.json
+    policy: rigpilot-policy.json
+```
+
+The Action creates `rigpilot-assessment.json`, writes a GitHub Step Summary, exposes structured
+outputs, and fails the step when the policy triggers. The complete deterministic walkthrough is
+in [`examples/github-actions`](examples/github-actions); the stable v1 interfaces and exit codes
+are defined in [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
+
 ## Principles
 
 - Native Windows execution in Warp/PowerShell.
 - Read-only diagnostics first.
 - Explicit approval before changes to drivers, services, startup, power settings, or hardware configuration.
-- Structured output suitable for future automation.
+- Deterministic structured output for scripts and CI policy gates.
 
 ## What it does
 
@@ -23,15 +77,16 @@ External probes run without a command shell and have a five-second default timeo
 checks use read-only CIM queries. NVIDIA detection uses `nvidia-smi` when available; its absence
 does not stop the rest of the snapshot.
 
-## Setup
+## Development setup
 
-RigPilot requires Python 3.11 or newer. With [uv](https://docs.astral.sh/uv/):
+With [uv](https://docs.astral.sh/uv/), install the development environment:
 
 ```powershell
 uv sync --extra dev
 ```
 
-The repository also includes `scripts\Enter-RigPilot.ps1` for its configured local environment.
+The repository also includes `scripts\Enter-RigPilot.ps1` for its configured development
+environment. The supported end-user installation path is shown in the quickstart above.
 
 ## Usage
 
@@ -257,7 +312,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Apply RigPilot policy
         id: rigpilot
-        uses: Arturo6PR/rigpilot@v0.9.0
+        uses: Arturo6PR/rigpilot@v1
         with:
           snapshot: current.json
           policy: .rigpilot/rigpilot-policy.json
@@ -277,6 +332,9 @@ It exposes `status`, `passed`, `warnings`, `failed`, `critical`, `report`, `exit
 `summary` outputs. `failed` is the number of canonical findings referenced by the policy
 decision; `passed` is a Boolean policy-gate result rather than an invented count of rules that
 the assessment report does not claim to have evaluated.
+
+`@v1` follows compatible v1 releases. Use `@v1.0.0` to select the exact first stable release, or
+pin the verified full release commit SHA when your workflow requires an immutable reference.
 
 The Action uses the unchanged policy-schema-1.0 report from v0.8.0 as its source of truth. It
 writes the complete deterministic JSON report before returning the policy decision, adds a
@@ -300,6 +358,29 @@ rigpilot assess current.json --policy-file .rigpilot/rigpilot-policy.json --form
 
 See [`examples/github-actions`](examples/github-actions) for a copyable workflow, policy, and
 snapshot-origin guidance.
+
+## Stable v1 contracts and exit codes
+
+RigPilot v1 treats its documented CLI commands/options, exit codes, schema-1.0 files, and GitHub
+Action inputs/outputs as public compatibility contracts. Existing v0.7-era policy files, v0.8
+structured reports, and v0.9 workflows require no migration.
+
+| Exit code | Meaning |
+| ---: | --- |
+| `0` | The operation completed; findings alone do not fail an assessment. |
+| `1` | An unexpected operational or internal error prevented completion. |
+| `2` | Arguments, inputs, paths, encodings, JSON, or policy configuration were invalid. |
+| `3` | A policy report was emitted and its configured `fail_on` threshold triggered. |
+
+See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for the authoritative contract, exact option
+and schema lists, deterministic report invariants, and privacy boundary.
+
+## Project references
+
+- [Stable v1 compatibility contract](docs/COMPATIBILITY.md)
+- [Canonical end-to-end GitHub Actions example](examples/github-actions)
+- [Changelog](CHANGELOG.md) and versioned [release notes](docs)
+- [Security reporting guidance](SECURITY.md)
 
 ## Development checks
 

@@ -99,3 +99,7 @@ finally {
         Remove-Item -LiteralPath $resolvedTemp -Recurse -Force
     }
 }
+
+# GitHub's pwsh wrapper propagates the last native exit code after the script returns. The demo
+# deliberately observes policy exit 3, so explicitly report success after every assertion passes.
+exit 0

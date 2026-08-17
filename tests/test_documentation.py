@@ -55,6 +55,7 @@ class DocumentationPresentationTests(unittest.TestCase):
         self.assertNotIn("--redact", script)
         self.assertNotIn("Get-ChildItem Env", script)
         self.assertIn("byte-for-byte identical", script)
+        self.assertTrue(script.rstrip().endswith("exit 0"))
         self.assertIn("Run-Demo.ps1 -Python python", workflow)
         for name in (
             "current.json",
